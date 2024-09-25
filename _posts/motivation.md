@@ -1,3 +1,8 @@
+---
+layout: default
+title: motivation
+---
+
 ## NEVER WASTE A MOTIVATED MOMENT
 
 

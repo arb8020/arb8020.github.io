@@ -1,3 +1,8 @@
+---
+layout: default
+title: spectatorsport 
+---
+
 ## "LEARNING IS NOT A SPECTATOR SPORT"
 
 > Math is not a spectator sport
