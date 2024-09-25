@@ -5,9 +5,6 @@ date: 2023-09-24
 slug: motivated-moment
 ---
 
-## NEVER WASTE A MOTIVATED MOMENT
-
-
 so basically i was at a company retreat, think its been like 6 months since, and we were doing a teambuilding activity. we each had to go around and say a quote that had made a meaningful difference in our lives. one of my coworkers offered the phrase: ‘never waste a motivated moment’. as he explained himself, his story started to really resonate with me. having the sparks of motivation at 3am, but not the follow through. having the feeling of being destined for more, but no results to prove it. being told to 'be more disciplined'. being told to just 'plan more' or 'build good habits', but nothing ever seemed to stick.
 
 
