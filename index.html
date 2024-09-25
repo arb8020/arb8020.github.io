@@ -1,3 +1,5 @@
+---
+---
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,12 +16,7 @@
             margin: 0 auto;
             background-color: #f5f5f5;
         }
-        h1 {
-            font-size: 24px;
-            font-weight: normal;
-            margin-bottom: 10px;
-        }
-        h2 {
+        h1, h2 {
             font-size: 16px;
             font-weight: bold;
             margin-top: 20px;
@@ -45,19 +42,17 @@
 <body>
     <h1>arb8020</h1>
     
-    <p>
-        <a href="https://x.com/arb8020">x.com/arb8020</a><br>
-    </p>
+    <p><a href="https://x.com/arb8020">x.com/arb8020</a></p>
     
     <p>brief description coming soon.</p>
+    
     <h2>stuff i've written</h2>
     <ul>
-        {% for post in site.posts %}
-        <li>
-            <a href="{{ post.url }}">{{ post.title }}</a>
-        </li>
-        {% endfor %}
+    {% for post in site.posts %}
+        <li><a href="{{ post.url }}">{{ post.title }}</a></li>
+    {% endfor %}
     </ul>
+    
     <h2>stuff i've made</h2>
     <ul>
         <li><a href="https://github.com/arb8020/optimizing-matmul-exercises">INTERACTIVE: CUDA matmul optimization</a></li>
