@@ -1,3 +1,10 @@
 markdown: kramdown
 plugins:
   - jekyll-feed
+
+defaults:
+  - scope:
+      path: "_posts"
+      type: "posts"
+    values:
+      layout: "post"
