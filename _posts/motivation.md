@@ -1,6 +1,7 @@
 ---
 layout: post
-title: "never waste a motivated moment"
+title: "reference post"
+date: 2024-09-24
 ---
 
 post _post_ *post* 
