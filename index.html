@@ -52,8 +52,11 @@
     <p>brief description coming soon.</p>
     <h2>stuff i've written</h2>
     <ul>
-        <li><a href="motivation.html">never waste a motivated moment</a></li>
-        <li><a href="spectatorsport.html">not a spectator sport</a></li>
+        {% for post in site.posts %}
+        <li>
+            <a href="{{ post.url }}">{{ post.title }}</a>
+        </li>
+        {% endfor %}
     </ul>
     <h2>stuff i've made</h2>
     <ul>
