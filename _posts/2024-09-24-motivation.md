@@ -1,6 +1,8 @@
 ---
-layout: default
-title: motivation
+layout: post
+title: "never waste a motivated moment"
+date: 2023-09-24
+slug: motivated-moment
 ---
 
 ## NEVER WASTE A MOTIVATED MOMENT

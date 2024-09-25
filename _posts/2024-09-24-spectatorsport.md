@@ -1,6 +1,8 @@
 ---
-layout: default
-title: spectatorsport 
+layout: post
+title: "learning is not a spectator sport"
+date: 2023-09-24
+slug: spectator-sport
 ---
 
 ## "LEARNING IS NOT A SPECTATOR SPORT"

@@ -1,2 +1,2 @@
 markdown: kramdown
-permalink: /:title.html
+permalink: /posts/:slug/
