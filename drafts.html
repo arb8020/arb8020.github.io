@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>arb8020</title>
+    <title>drafts - arb8020</title>
     <style>
         body {
             font-family: 'Menlo', 'Courier New', monospace;
@@ -40,25 +40,16 @@
     </style>
 </head>
 <body>
-    <h1>arb8020</h1>
+    <h1>drafts / work in progress</h1>
     
-    <p><a href="https://x.com/arb8020">x.com/arb8020</a></p>
+    <p><a href="{{ '/' | relative_url }}">← back to home</a></p>
     
-    <p>brief description coming soon.</p>
+    <p>incomplete thoughts and works in progress.</p>
     
-    <h2>stuff i've written</h2>
     <ul>
-	<li><a href="{{ '/posts/motivated-moment' | relative_url }}">never waste a motivated moment</a></li>
-   </ul>
-
-    <h2>stuff i've made</h2>
-    <ul>
-        <li><a href="https://github.com/arb8020/optimizing-matmul-exercises">INTERACTIVE: CUDA matmul optimization</a></li>
-    </ul>
-
-    <h2>other</h2>
-    <ul>
-        <li><a href="{{ '/drafts' | relative_url }}">drafts / work in progress</a></li>
+    {% for draft in site.drafts %}
+        <li><a href="{{ draft.url | relative_url }}">{{ draft.title }}</a></li>
+    {% endfor %}
     </ul>
 </body>
 </html>
