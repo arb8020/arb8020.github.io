@@ -52,6 +52,13 @@
 	<li><a href="{{ '/posts/links-i-like' | relative_url }}">links that i like</a></li>
    </ul>
 
+    <h2>research notes</h2>
+    <ul>
+        {% for note in site.research-notes %}
+        <li><a href="{{ note.url | relative_url }}">{{ note.title }}</a></li>
+        {% endfor %}
+    </ul>
+
     <h2>stuff i've made</h2>
     <ul>
         <li><a href="https://github.com/arb8020/optimizing-matmul-exercises">INTERACTIVE: CUDA matmul optimization</a></li>

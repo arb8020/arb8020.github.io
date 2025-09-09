@@ -1,3 +1,8 @@
 markdown: kramdown
 permalink: /posts/:slug/
 show_drafts: true
+
+collections:
+  research-notes:
+    output: true
+    permalink: /research-notes/:slug/
