@@ -22,19 +22,23 @@ methodology:
   - Two activation points per layer: layer norm into attention + layer norm into MLP
   - outlier feature: at least 6.0 magnitude, present in at least 25% of layers, present across at least 6% of sequence
 
+```python
 MODELS = [
     "allenai/OLMoE-1B-7B-0125-Instruct",     # olmoe 7B-A1B
     "Qwen/Qwen3-30B-A3B",                    # qwen3_moe 30.5B-A3.3B
     "zai-org/GLM-4.5-Air",                  # glm4_moe 106B-A12B
 ]
+```
 
 due to self-imposed limitations, i only got to study the above 3 models. i tried to let claude code do more heavy lifting than was effective, so in future experiments i expect to be a bit more hands on with respect to deploying multiple models at once. these notes are pretty rough/exploratory but i want to get in the habit of publicizing what i'm doing. 
 
+```json
 {
 "OLMoE-1B-7B": {"layer_pct": 28.0, "seq_pct": 14.3, "active_params": "1.3B"},
 "Qwen3-30B-A3B": {"layer_pct": 35.5, "seq_pct": 45.1, "active_params": "3.3B"},
 "GLM-4.5-Air": {"layer_pct": 67.4, "seq_pct": 46.8, "active_params": "12B"}
 }
+```
 
 interestingly, these rough preliminary results make it seem like the outlier features threshold has increased. the phase shift around 6.7B parameters doesn't appear to cleanly translate towards active params. i suspect part of this might be because the use of experts and the router sort of replaced what the dense models used to use outlier features for. i'm not sure how we might verify that but food for thought. 
 
