@@ -6,6 +6,10 @@ categories: [research]
 tags: [ocaml, union-types, compiler-design]
 ---
 
+<!-- TODO: Add introduction explaining what ADTs are and why they matter before diving into implementation
+     Feedback: "The document really teaches 'implementing ADTs from scratch in Python' - the motivation is assumed rather than explained. A reader who doesn't already know why ADTs matter won't find that motivation here. Consider adding a brief intro explaining what problems ADTs solve at a high level before diving into implementation."
+     Suggestion: "Add a 'Why Should You Care?' section - Start with a real problem that's painful without ADTs, then show how they solve it" -->
+
 motivating union types:
 
 i'm writing graphics code, and i have both a Circle and a Rectangle 
@@ -42,6 +46,9 @@ but we might either need to allocate 8 bytes or 16 bytes, depending on if its Ci
 the dumbest way to do this is to allocate for 16 anyways, and then add 1 byte at the front for if its a Circle or Rectangle
 
 MAX_SIZE = max(8,16)
+<!-- TODO: Fix allocation size - this breaks when adding triangle (needs 25 bytes, not 17)
+     Feedback: "The 9-byte allocation for shapes (1 + max(4,8)) is mentioned but the triangle needs 13 bytes"
+     Note: Triangle needs 1 (tag) + 8 + 8 + 8 = 25 bytes total -->
 buffer = bytearray(1 + MAX_SIZE) # + 1 for the tag
 
 now, we can write
@@ -57,7 +64,12 @@ def make_rectangle(w: float, h: float) -> bytearray:
     buf[0] = 1                       # assign tag
     write_float(buf, 1, w)
     write_float(buf, 9, h)          # second double 8 bytes later
+    <!-- TODO: Replace magic numbers with named constants (RADIUS_OFFSET=1, WIDTH_OFFSET=1, HEIGHT_OFFSET=9)
+         Feedback: "You rightfully complain about tag == 0 being unreadable, but the code still has offset + 1, offset + 5, offset + 9 with zero named constants. If the goal is to teach 'make illegal states unrepresentable', practise it on the byte level too." -->
     return buf
+
+<!-- TODO: Add missing imports: import struct, math, from typing import Tuple
+     Feedback: "Missing imports: Never shown but needed: import struct, import random, from math import pi" -->
 
 def write_float(buf, offset, value):
     buf[offset:offset+8] = struct.pack('<d', value) # serialize to bytes
@@ -69,6 +81,10 @@ great, now when we make a circle or rectangle, we can appropriately write the va
 but just the buffer isn't really what we wanted
 we still haven't figured out how to cleanly write 'Shape' and have our code help us out
 if we were to write get_area(shape) right now, it might look something like
+
+<!-- TODO: Add bounds checking and error handling for buffer access
+     Feedback: "set_pixel(x, y, colour) silently assumes x, y in bounds; either assert or mention the cost of defensive checks"
+     Also applies to buffer access which could go out of bounds -->
 
 def get_area_unsafe(shape_buffer):
     tag = shape_buffer[0]
@@ -111,13 +127,20 @@ def make_union(*tag_info):
 
 
 
+<!-- TODO: Add bridge paragraph explaining why we need unions after showing product type limitations
+     Feedback: "The transition between products and sums feels abrupt. After building up product types organically, the sum type section starts fresh with 'I have both a Circle and a Rectangle' without explaining why the product type approach breaks down here. Adding a failed attempt to handle shapes with products would make the need for sum types clearer." -->
+
 so now we can do something like
+<!-- TODO: Fix function name - should be make_union, not make_union_basic -->
 shape = make_union_basic(
     ('circle', 0),
     ('rectangle', 1)
 )
 
 and 
+
+<!-- TODO: Standardize parameter names - shape_buffer vs buffer inconsistency
+     Feedback: "Inconsistent variable names" throughout the codebase -->
 
 def get_area_shapeval(buffer: bytearray, Shape) -> float:
     validated_buffer = Shape['validate'](shape_buffer)  # validate the buffer can be a shape
@@ -200,6 +223,8 @@ def make_union_with_accessors(type_name, *variants):
 
 and now we have
 
+<!-- TODO: Fix syntax error - should use dict {}, not list [] for field accessors
+     Note: This will cause a runtime error -->
 Shape = make_union_with_accessors('Shape',
     ('circle', 0, [get_circle_radius]),
     ('rectangle', 1, [get_rectangle_width, get_rectangle_height])
@@ -234,6 +259,10 @@ Shape['safe_access'](circle_buffer, 'width')   # error: Field 'width' not availa
 
 now, let's think about what might happen if we wanted to expand what a Shape can be
 let's say we wanted to add a 'triangle' that looks like
+
+<!-- TODO: Add validation for triangle inequality and angle bounds
+     Feedback: "The triangle area formula uses sin on an angle that came from random.randint(0, 127)—radians vs degrees bug waiting to happen"
+     Should validate: a + b > c, a + c > b, b + c > a and 0 < gamma < π -->
 
 def make_triangle(a: float, gamma: float, b: float) -> bytearray:
     buf = bytearray(buffer)
@@ -326,6 +355,10 @@ def make_union(type_name, *variants):
     
     return UnionType
 
+<!-- TODO: Add section discussing memory overhead, performance costs, and alternative approaches
+     Feedback: "No discussion of tradeoffs or alternative approaches"
+     Should cover: "This approach has tradeoffs: Pro: Type safety at runtime, exhaustiveness checking; Con: Memory overhead (wasted bytes for smaller variants), Performance cost of validation on every access; Alternative: Could use typed pointers instead of tags..." -->
+
 this will now allow us to not only write 
 
 Shape = make_union('Shape',
@@ -338,6 +371,8 @@ but will now also make it so that we can finally write the beautiful
 
 def get_area(buffer, Shape):
     return Shape.match(buffer,
+        <!-- TODO: Consider performance implications of lambda closures on every match call
+             Feedback: "lambda offset, fields: is clever, but the extra closure allocation on every match is measurable; at least footnote it." -->
         circle=lambda buf, fields: 3.14159 * fields['radius'](buf) ** 2,
         rectangle=lambda buf, fields: fields['width'](buf) * fields['height'](buf),
         triangle=lambda buf, fields: 0.5
@@ -367,5 +402,12 @@ def get_area(s: Shape) -> float:
         case Circle(r):           return math.pi * r**2
         case Rectangle(w, h):     return w * h
         case Triangle(a, γ, b):   return 0.5 * a * b * math.sin(γ)
-``` 
+```
+
+<!-- TODO: Add conclusion tying together the journey from raw bytes to type-safe pattern matching
+     Feedback: "Missing conclusion tying things together" and "Current ending: ... Needs: A conclusion that ties it back to the beginning"
+     Suggested conclusion: "We've built ADTs from raw bytes, discovering why we need: Product types: For data that belongs together (position = x AND y), Sum types: For data with variants (shape = circle OR rectangle OR triangle), Pattern matching: For safe, exhaustive variant handling. This journey from memory[255] = 255 to type-safe pattern matching shows..." -->
+
+<!-- TODO: Standardize type hints usage throughout all function definitions
+     Feedback: "Mix of styles in same section" - some functions have type hints, others don't -->
 
