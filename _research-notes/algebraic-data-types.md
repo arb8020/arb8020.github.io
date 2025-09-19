@@ -5,6 +5,10 @@ date: 2025-09-18
 slug: algebraic-data-types
 ---
 
+<!-- TODO: Add introduction explaining what ADTs are and why they matter before diving into implementation
+     Feedback: "The document really teaches 'implementing ADTs from scratch in Python' - the motivation is assumed rather than explained. A reader who doesn't already know why ADTs matter won't find that motivation here. Consider adding a brief intro explaining what problems ADTs solve at a high level before diving into implementation."
+     Suggestion: "Add a 'Why Should You Care?' section - Start with a real problem that's painful without ADTs, then show how they solve it" -->
+
 **motivating product types**
 
 i'm writing graphics code, and i want to go from an empty screen, to a display
@@ -46,6 +50,8 @@ let me try to track the sun's position a bit more carefully
 let's make a variable for where our variable space begins, to make sure we don't interfere with the screen
 
 ```python
+<!-- TODO: Delete the whole "manual offset" prelude
+     Feedback: "KILL (≈ 220 words): sun_x_addr = VAR_SPACE_OFFSET + 0... Nobody needs to see you suffer through hand-counting once you immediately show alloc_u8() two screens later." -->
 VAR_SPACE_OFFSET = 65536
 sun_x_addr = VAR_SPACE_OFFSET + 0
 sun_y_addr = VAR_SPACE_OFFSET + 1
@@ -60,6 +66,8 @@ ok, this isn't so bad
 now i want to add some stars. let me allocate space for them:
 
 ```python
+<!-- TODO: Collapse the three allocation helpers into one code block
+     Feedback: "KILL the narrative between the first alloc_u8 and the first set_pixel call (≈ 180 words)." -->
 star1_x_addr = VAR_SPACE_OFFSET + 3
 star1_y_addr = VAR_SPACE_OFFSET + 4
 star1_brightness_addr = VAR_SPACE_OFFSET + 5
@@ -87,6 +95,8 @@ def write_u8(offset, value):
 def read_u8(offset):
     return memory[VAR_SPACE_OFFSET + offset]
 
+<!-- TODO: Add bounds checking and error handling for buffer access
+     Feedback: "set_pixel(x, y, colour) silently assumes x, y in bounds; either assert or mention the cost of defensive checks" -->
 def set_pixel(x, y, color):
     memory[x + y * 256] = color
 ```
@@ -119,6 +129,8 @@ def alloc_position():
     next_free += 2  # Position needs 2 bytes
     return offset
 
+<!-- TODO: Replace magic numbers with named constants (POSITION_X_OFFSET=0, POSITION_Y_OFFSET=1)
+     Feedback: "You rightfully complain about tag == 0 being unreadable, but the code still has offset + 1, offset + 5, offset + 9 with zero named constants." -->
 def write_position(offset, x, y):
     """Write a Position to variable space"""
     memory[VAR_SPACE_OFFSET + offset + 0] = x
@@ -171,15 +183,17 @@ now let's create a full night sky:
 
 ```python
 stars = []
+<!-- TODO: Add missing imports: import struct, math, random from typing import Tuple
+     Feedback: "Missing imports: Never shown but needed: import struct, import random, from math import pi" -->
 for i in range(10):
     star = alloc_star()
-    
+
     temp_pos = alloc_position()
 
-    write_position(temp_pos, 
+    write_position(temp_pos,
                   random.randint(0, 255),  # any x
                   random.randint(0, 127))  # y (top half)
-    
+
     write_star(star, temp_pos, random.randint(100, 250))
     stars.append(star)
 ```
@@ -188,6 +202,9 @@ notice how product types make it easy to do a few things.
 for one, now its hard to update y whenever we want to update x, since they're part of the same object
 also, we're guaranteed to store x and y next to each other, better for the cache
 our code looks cleaner too, our 'star' can take in a 'position', its easier to reason about
+
+<!-- TODO: Add bridge paragraph explaining why we need unions after showing product type limitations
+     Feedback: "The transition between products and sums feels abrupt. After building up product types organically, the sum type section starts fresh with 'I have both a Circle and a Rectangle' without explaining why the product type approach breaks down here. Adding a failed attempt to handle shapes with products would make the need for sum types clearer." -->
 
 **motivating sum types**
 
@@ -267,6 +284,9 @@ but we might either need to allocate 4 bytes or 8 bytes, depending on if its Cir
 the simplest way to do this is to allocate for the max anyways, and then add 1 byte at the front for if its a Circle or Rectangle
 
 ```
+<!-- TODO: Fix allocation size - this breaks when adding triangle (needs 13 bytes, not 9)
+     Feedback: "The 9-byte allocation for shapes (1 + max(4,8)) is mentioned but the triangle needs 13 bytes"
+     Note: Triangle needs 1 (tag) + 4 + 4 + 4 = 13 bytes total -->
 MAX_SIZE = max(4, 8)
 shape_size = 1 + MAX_SIZE  # + 1 for the tag
 
@@ -288,6 +308,8 @@ def make_rectangle(w: float, h: float) -> int:
     memory[VAR_SPACE_OFFSET + offset] = 1  # assign tag
     write_float(offset + 1, w)
     write_float(offset + 5, h)             # height at offset 5 (1 + 4 bytes for width)
+    <!-- TODO: Replace magic numbers with named constants (TAG_OFFSET=0, RADIUS_OFFSET=1, WIDTH_OFFSET=1, HEIGHT_OFFSET=5)
+         Feedback: "Magic numbers still everywhere. You rightfully complain about tag == 0 being unreadable, but the code still has offset + 1, offset + 5, offset + 9 with zero named constants." -->
     return offset
 ```
 
@@ -297,6 +319,8 @@ we still haven't figured out how to cleanly write 'Shape' and have our code help
 if we were to write get_area(shape) right now, it might look something like
 
 ```python
+<!-- TODO: Add bounds checking and error handling for buffer access
+     Feedback: "Incomplete error handling in code examples" and "set_pixel(x, y, colour) silently assumes x, y in bounds; either assert or mention the cost of defensive checks" -->
 def get_area_unsafe(shape_offset):
     tag = memory[VAR_SPACE_OFFSET + shape_offset]
     if tag == 0:  # we remember that tag == 0 -> circle
@@ -350,6 +374,8 @@ shape = make_union(
 and
 
 ```python
+<!-- TODO: Standardize parameter names - shape_offset vs offset inconsistency
+     Feedback: "Inconsistent variable names" throughout the codebase -->
 def get_area_shapeval(shape_offset: int, Shape) -> float:
     validated_offset = Shape['validate'](shape_offset)  # validate the offset can be a shape
     tag = memory[VAR_SPACE_OFFSET + validated_offset]
@@ -438,6 +464,8 @@ def make_union_with_accessors(type_name, *variants):
 and now we have
 
 ```python
+<!-- TODO: Fix syntax error - should use dict {}, not list [] for field accessors
+     Note: This will cause a runtime error -->
 Shape = make_union_with_accessors('Shape',
     ('circle', 0, [get_circle_radius]),
     ('rectangle', 1, [get_rectangle_width, get_rectangle_height])
@@ -478,6 +506,9 @@ now, let's think about what might happen if we wanted to expand what a Shape can
 let's say we wanted to add a 'triangle' that looks like
 
 ```python
+<!-- TODO: Add validation for triangle inequality and angle bounds
+     Feedback: "The triangle area formula uses sin on an angle that came from random.randint(0, 127)—radians vs degrees bug waiting to happen"
+     Should validate: a + b > c, a + c > b, b + c > a and 0 < gamma < π -->
 def make_triangle(a: float, gamma: float, b: float) -> int:
     offset = alloc_shape()
     memory[VAR_SPACE_OFFSET + offset] = 2  # tag for triangle
@@ -574,6 +605,10 @@ def make_union(type_name, *variants):
     return UnionType
 ```
 
+<!-- TODO: Add section discussing memory overhead, performance costs, and alternative approaches
+     Feedback: "No discussion of tradeoffs or alternative approaches"
+     Should cover: "This approach has tradeoffs: Pro: Type safety at runtime, exhaustiveness checking; Con: Memory overhead (wasted bytes for smaller variants), Performance cost of validation on every access; Alternative: Could use typed pointers instead of tags..." -->
+
 this will now allow us to not only write
 
 ```python
@@ -589,6 +624,8 @@ but will now also make it so that we can finally write the beautiful
 ```python
 def get_area(shape_offset, Shape):
     return Shape.match(shape_offset,
+        <!-- TODO: Consider performance implications of lambda closures on every match call
+             Feedback: "lambda offset, fields: is clever, but the extra closure allocation on every match is measurable; at least footnote it." -->
         circle=lambda offset, fields: 3.14159 * fields['radius'](offset) ** 2,
         rectangle=lambda offset, fields: fields['width'](offset) * fields['height'](offset),
         triangle=lambda offset, fields: 0.5
@@ -621,6 +658,15 @@ def get_area(s: Shape) -> float:
         case Triangle(a, γ, b):   return 0.5 * a * b * math.sin(γ)
 ```
 
+<!-- TODO: Add conclusion tying together the journey from raw bytes to type-safe pattern matching
+     Feedback: "Missing conclusion tying things together" and "Current ending: ... Needs: A conclusion that ties it back to the beginning"
+     Suggested conclusion: "We've built ADTs from raw bytes, discovering why we need: Product types: For data that belongs together (position = x AND y), Sum types: For data with variants (shape = circle OR rectangle OR triangle), Pattern matching: For safe, exhaustive variant handling. This journey from memory[255] = 255 to type-safe pattern matching shows..." -->
 
-*) 
+<!-- TODO: Standardize type hints usage throughout all function definitions
+     Feedback: "Mix of styles in same section" - some functions have type hints, others don't -->
+
+<!-- TODO: Compress the final "real Python" comparison
+     Feedback: "You currently show the dataclass and the full match body again. Just show the signature... Tell the reader the complete gist is in the repo. ≈ 90 words saved." -->
+
+*)
 
