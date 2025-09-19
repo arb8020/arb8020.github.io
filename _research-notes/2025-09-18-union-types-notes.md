@@ -2,8 +2,6 @@
 layout: post
 title: "Union Types Notes"
 date: 2025-09-18
-categories: [research]
-tags: [ocaml, union-types, compiler-design]
 slug: union-types-notes
 ---
 

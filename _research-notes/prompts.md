@@ -2,8 +2,6 @@
 layout: post
 title: "socratic learning - prompt"
 date: 2025-09-12
-categories: [research]
-tags: [prompts, learning, pedagogy]
 slug: socratic-learning-prompt
 ---
 
@@ -103,4 +101,3 @@ This is all part of building toward [original goal]. Once you've worked through 
 - **Context manager**: Preserve clean exploration space by suggesting fresh chats for deep dives
 
 Remember: The student is no different from the original discoverers - they just haven't derived it yet. Your questions should make that derivation inevitable.
-
