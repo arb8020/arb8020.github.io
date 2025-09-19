@@ -49,9 +49,7 @@
     <h2>stuff i've written</h2>
     <ul>
         {% for post in site.posts %}
-        {% if post.slug == 'motivated-moment' or post.slug == 'links-i-like' %}
         <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a> ({{ post.date | date: "%Y-%m-%d" }})</li>
-        {% endif %}
         {% endfor %}
     </ul>
 
@@ -69,9 +67,9 @@
 
     <h2>stuff i've drafted</h2>
     <ul>
-        <li><a href="{{ '/posts/fingerprints-in-silicon' | relative_url }}">fingerprints in silicon</a></li>
-        <li><a href="{{ '/posts/janky-simulators' | relative_url }}">janky simulators might be enough</a></li>
-        <li><a href="{{ '/posts/spectator-sport' | relative_url }}">learning is not a spectator sport</a></li>
+        {% for draft in site.drafts %}
+        <li><a href="{{ draft.url | relative_url }}">{{ draft.title }}</a></li>
+        {% endfor %}
     </ul>
 </body>
 </html>
