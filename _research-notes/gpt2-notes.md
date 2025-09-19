@@ -1,3 +1,11 @@
+---
+layout: post
+title: "gpt-2 - notes"
+date: 2025-09-09
+categories: [research]
+tags: [gpt2, transformers, neural-networks]
+slug: gpt2-discovery-fiction
+---
 
 """
 layers:
@@ -147,7 +155,6 @@ finally after a bunch of these layers, 12 in specific, we take the final residua
 TODO: rushed, forgot the final softmax step 
 
 """
-
 
 
 

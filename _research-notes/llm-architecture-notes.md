@@ -1,3 +1,12 @@
+---
+layout: post
+title: "llm architecture - notes"
+date: 2024-10-15
+categories: [research]
+tags: [llm, architecture, transformers, attention]
+slug: llm-architecture-discovery-fiction
+---
+
 # architecture
 
 ## computation/thinking layers

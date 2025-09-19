@@ -1,9 +1,10 @@
-
 ---
+layout: post
 title: "Union Types Notes"
 date: 2025-09-18
 categories: [research]
 tags: [ocaml, union-types, compiler-design]
+slug: union-types-notes
 ---
 
 <!-- TODO: Add introduction explaining what ADTs are and why they matter before diving into implementation
@@ -410,4 +411,3 @@ def get_area(s: Shape) -> float:
 
 <!-- TODO: Standardize type hints usage throughout all function definitions
      Feedback: "Mix of styles in same section" - some functions have type hints, others don't -->
-
