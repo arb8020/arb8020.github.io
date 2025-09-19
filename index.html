@@ -48,14 +48,17 @@
     
     <h2>stuff i've written</h2>
     <ul>
-	<li><a href="{{ '/posts/motivated-moment' | relative_url }}">never waste a motivated moment</a></li>
-	<li><a href="{{ '/posts/links-i-like' | relative_url }}">links that i like</a></li>
-   </ul>
+        {% for post in site.posts %}
+        {% unless post.categories contains 'draft' %}
+        <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a> ({{ post.date | date: "%Y-%m-%d" }})</li>
+        {% endunless %}
+        {% endfor %}
+    </ul>
 
     <h2>research notes</h2>
     <ul>
         {% for note in site.research-notes %}
-        <li><a href="{{ note.url | relative_url }}">{{ note.title }}</a></li>
+        <li><a href="{{ note.url | relative_url }}">{{ note.title }}</a> ({{ note.date | date: "%Y-%m-%d" }})</li>
         {% endfor %}
     </ul>
 

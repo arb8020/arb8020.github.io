@@ -1,0 +1,13 @@
+chiraagbalu@Chiraags-MacBook-Air arb8020.github.io % git push -u origin main
+Username for 'https://github.com': arb8020
+Password for 'https://arb8020@github.com': 
+remote: Permission to arb8020/arb8020.github.io.git denied to arb8020.
+fatal: unable to access 'https://github.com/arb8020/arb8020.github.io/': The requested URL 
+returned error: 403
+chiraagbalu@Chiraags-MacBook-Air arb8020.github.io % git push -u origin main
+Username for 'https://github.com': arb8020
+Password for 'https://arb8020@github.com': 
+remote: Permission to arb8020/arb8020.github.io.git denied to arb8020.
+fatal: unable to access 'https://github.com/arb8020/arb8020.github.io/': The requested URL 
+returned error: 403
+
