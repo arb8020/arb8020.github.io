@@ -49,9 +49,9 @@
     <h2>stuff i've written</h2>
     <ul>
         {% for post in site.posts %}
-        {% unless post.categories contains 'draft' %}
+        {% if post.slug == 'motivated-moment' or post.slug == 'links-i-like' %}
         <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a> ({{ post.date | date: "%Y-%m-%d" }})</li>
-        {% endunless %}
+        {% endif %}
         {% endfor %}
     </ul>
 
