@@ -3,6 +3,7 @@ layout: post
 title: "fingerprints in silicon"
 date: 2025-07-21
 slug: fingerprints-in-silicon
+categories: [draft]
 ---
 
 the use of generative AI does not automatically disqualify a piece from being considered art. but why not? i messily type in half word salad, half run-on sentence to a diffusion model, and i get back a high resolution image that might've taken a friend weeks. isn't that cheap? unfair?  

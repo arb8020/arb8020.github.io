@@ -67,7 +67,7 @@
 
     <h2>stuff i've drafted</h2>
     <ul>
-        {% for draft in site.drafts %}
+        {% for draft in site.draft-posts %}
         <li><a href="{{ draft.url | relative_url }}">{{ draft.title }}</a></li>
         {% endfor %}
     </ul>

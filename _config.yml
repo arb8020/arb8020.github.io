@@ -6,3 +6,6 @@ collections:
   research-notes:
     output: true
     permalink: /research-notes/:slug/
+  draft-posts:
+    output: true
+    permalink: /drafts/:slug/
