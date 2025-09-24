@@ -183,3 +183,11 @@ important caveats:
 - blog post about the importance of hiring passionate, committed people
 - for an obsessed person, it's always worth it
 - this blog post isn't as good as i remember it, but i think the quote from above i think is pretty compelling
+
+**[Adventures with Anxiety! - Nicky Case](https://ncase.me/anxiety/)**
+- interactive story/game about understanding anxiety
+- i liked anxiety bc it was a little playable way to reinforce the 'emotions make sense' idea by showing that anxiety is actually something that serves a purpose, and it can be listened to without it taking over
+
+**[The Evolution of Trust - Nicky Case](https://ncase.me/trust/)**
+- interactive game exploring cooperation and trust through game theory
+- i liked the trust game because it was fun and a nice way to communicate the ideas. the sandboxes/exploration with the sliders and seeing how the game changes when you change the parameters are great ways to reinforce looking for positive sum games, trying to have low miscommunication rates, and the value of forgiveness. can also be read as blackpilling when you think about the lack of repeated games + high miscommunication rates we currently have. matter of perspective
