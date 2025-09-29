@@ -7,7 +7,11 @@ slug: webscraping-monads
 
 ### chaining error-prone steps: webscraping and monads
 
-a lot of code starts out pretty clean, and then ends up looking like a soup of defensive programming and try/except blocks. here's a web-scraper for a data pipeline:
+a lot of code starts out pretty clean, and then ends up looking like a soup of defensive programming and try/except blocks. 
+
+i'm going to try to illustrate how monads fall out as a clean solution to this problem, without any category theory or other math jargon
+
+here's a web-scraper for a data pipeline:
 
 ```python
 import requests, json
@@ -53,10 +57,10 @@ this makes the code pretty messy for what should be a relatively simple/readable
 
 notice the pattern i keep having to write:
 
-1. try to do something  
-2. check if it failed  
-3. return an error if it did  
-4. thread into the next step, or short-circuit on failure
+- try to do something  
+- check if it failed  
+- return an error if it did  
+- thread into the next step, or short-circuit on failure
 
 ```python
 try:
