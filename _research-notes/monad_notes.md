@@ -7,13 +7,7 @@ slug: webscraping-monads
 
 ### chaining error-prone steps: webscraping and monads
 
-i'm writing a web-scraper for a data pipeline, but my code is really finicky.  
-there's a ton of different potential error cases.  
-for example, my code might fail at the network-request level because i'm not connected to wi-fi, and i wanna know about it.  
-or my request might have the wrong parameters and fail authentication.  
-i might also fail to parse a page because my html parser gets confused about some special characters.
-
-this makes my code look really gross:
+a lot of code starts out pretty clean, and then ends up looking like a soup of defensive programming and try/except blocks. here's a web-scraper for a data pipeline:
 
 ```python
 import requests, json
@@ -53,7 +47,9 @@ def scrape_movie_data(movie_id):
     return {'title': title, 'rating': rating}, None
 ```
 
-this is pretty messy for what should be a relatively simple/readable data pipeline
+there's a ton of different potential error cases we're defending against. failing at the network request level because i'm not connected to wifi, failing authentication, page structure variance causing the parsing/extraction to fail, etc
+
+this makes the code pretty messy for what should be a relatively simple/readable data pipeline
 
 notice the pattern i keep having to write:
 

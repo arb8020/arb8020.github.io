@@ -191,3 +191,15 @@ important caveats:
 **[The Evolution of Trust - Nicky Case](https://ncase.me/trust/)**
 - interactive game exploring cooperation and trust through game theory
 - i liked the trust game because it was fun and a nice way to communicate the ideas. the sandboxes/exploration with the sliders and seeing how the game changes when you change the parameters are great ways to reinforce looking for positive sum games, trying to have low miscommunication rates, and the value of forgiveness. can also be read as blackpilling when you think about the lack of repeated games + high miscommunication rates we currently have. matter of perspective
+
+## cooking
+
+**[How to Wash Dishes Without Hating Every Moment of It](https://www.youtube.com/watch?v=vyis-EmiZXI)**
+- youtube video on proper dishwashing technique and mindset
+- teaches people how to wash dishes, which not everyone even knows how to do well/properly and adds some tidbits about how to make it more enjoyable/less daunting by doing a couple dishes while cooking
+- its the main reason a lot of people don't cook so i think it has to be included in any video about cooking
+
+**[What does "medium heat" mean?](https://www.youtube.com/watch?v=HYRE6DER_zo)**
+- youtube video explaining how to gauge cooking heat levels
+- the thing that bothered me about heat level ambiguity is everyone has different burners, but this provides a list of visual/audio/practical cues someone can use to better figure out what 'heat' theyre at
+- phrasing medium in terms of what it does to toasting bread or butter is actually more precise than 'put 7 on ur burner' bc 7 on mine is different from someone else's 7
