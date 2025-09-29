@@ -1,3 +1,10 @@
+---
+layout: post
+title: "chaining error-prone steps: webscraping and monads"
+date: 2025-09-28
+slug: webscraping-monads
+---
+
 ### chaining error-prone steps: webscraping and monads
 
 i'm writing a web-scraper for a data pipeline, but my code is really finicky.  
