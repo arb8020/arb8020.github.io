@@ -42,7 +42,7 @@ i'm still trying to figure out what exactly to do about this. it was a cool expe
 
 i am still curious where that outlier feature coordination went, and what it was doing. perhaps it was some sort of strange crude mechanism that worked for these smaller/weaker models, that has been subsumed by more elegant structures in modern models, as shown in Anthropic's circuit analysis blog.
 
-below are some more details on methodology, and the code is available at [github.com/arb8020/research](https://github.com/arb8020/research/blob/main/dev/outlier-features/README.md) for scrutiny. i'd love to get feedback/more thoughts in DMs/replies at x.com/arb8020. always happy to chat!
+below are some more details on methodology, and the code is available [here](https://github.com/arb8020/research/blob/main/dev/outlier-features/README.md) for scrutiny. i'd love to get feedback/more thoughts in DMs/replies at x.com/arb8020. always happy to chat!
 
 
 ## methodology
