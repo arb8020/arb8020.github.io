@@ -11,47 +11,66 @@ tl;dr: was not able to pinpoint a empirical reason for folklore of intelligence 
 
 reading RL rollouts while post-training small models, I noticed a huge gap in intelligence of models above and below ~7B parameters. twitter seemed to corroborate this, and it seems to actually be generally accepted folklore that different parameter counts just had emergent step changes in intelligence.
 
-naturally my first thought upon finding this was 'well is it 7B total or active'. I think the tweets I saw were talking about dense models, so it wasn't exactly clear what the answer would be here. digging through the threads, I found references to Tim Dettmers' 2022 paper on outlier features, and decided to read it.
+[tweet embeds here]
 
-dettmers' found that extreme magnitude values in model residual streams started to systematically coordinate across layers around ~6.7B parameters. he called this a phase transition and claimed that 'transformers after the phase shift at 6.7B parameters behave very different to transformers before the phase shift ... one should not try to generalize from <6.7B to beyond'. this is a pretty strong claim, so I thought it would be important for my own experiments to find out how this claim held up for MoE models.
+[vikhyatk](https://x.com/vikhyatk/status/1954479661788053882) and [_xjdr](https://x.com/_xjdr/status/1954580381266833631) 
 
-the intuitive explanation in the blog was that transformers needed to 'remove noisy context-irrelevant features' for particular tokens, and outlier features were how this worked. but if we're looking at MoE models, the router might already take care of this.
+naturally my first thought upon finding this was 'well is it 7B total or active'. I think the tweets I saw were talking about dense models, so it wasn't exactly clear what the answer would be here. digging through the threads, I found references to Tim Dettmers' 2022 paper on int8 quantization, and decided to read it.
+
+in the process of getting int8 quantization to work, dettmers found what he called 'outlier features' in model residual streams. he found that specific dimension indices had extreme magnitude values (>= 6.0, compared to typical ranges +- 3.5) that showed up across layers and tokens in the residual stream tensor.
+
+the intuitive explanation is that transformers have two processing streams: one that processes inputs, and one that suppresses noisy features that aren't relevant to the current context. dedicating specific hidden dimensions to feature removal means that layers can coordinate, and know which dimensions can be multiplied by large values to suppress other features. (more on this [here](https://timdettmers.com/2022/08/17/llm-int8-and-emergent-features/))
+
+dettmers' found that these extreme magnitude values in model residual streams started to systematically coordinate across layers around ~6.7B parameters. he called this a phase transition and claimed that 'transformers after the phase shift at 6.7B parameters behave very different to transformers before the phase shift ... one should not try to generalize from <6.7B to beyond'. this is a pretty strong claim, so I thought it would be important for my own experiments to find out how this claim held up for MoE models.
+
+![Dettmers Phase Transition](/assets/images/dettmers-phase-transition.png)
+*Figure 3 from Dettmers et al. (2022): Percentage of layers and sequence dimensions affected by large magnitude outlier features across transformers by (a) model size or (b) C4 perplexity. Shows the phase transition at ~6.7B parameters.*
 
 so I ran the experiment Dettmers' did. I swept over 7 MoE models that have come out recently, to try to pinpoint a phase transition point, either based on active/total parameters, or perhaps even related to the sparsity. I suspected it would be based on total params, since that would be more related to 'total model capacity', or that we wouldn't find it at all due to the router.
 
 the MoE results were messy - basically no pattern. outliers ranged from 49 to 4,635, layer coordination (L%) was all over the place from 29% to 63%.
 
 ![MoE Models - Total Parameters vs Layer Coverage](/assets/images/moe-total-params-layer-pct.png)
-*Figure 1: No clear phase transition in MoE models when plotted by total parameters*
+*figure 1: no clear phase transition in MoE models when plotted by total parameters*
 
 ![MoE Models - Active Parameters vs Layer Coverage](/assets/images/moe-active-params-layer-pct.png)
-*Figure 2: Similarly messy results when plotted by active parameters*
+*figure 2: similarly messy results when plotted by active parameters*
 
 so I thought my hypothesis about the routing was most likely. but then I remembered these were also 2024-2025 models, and Dettmers was using models from 2022, basically an eternity ago. to be rigorous, I decided to run another sweep on some frontier open dense models, specifically the Qwen3 series
 
 here's where it gets interesting.
 
 ![Dense Models - Parameters vs Layer Coverage](/assets/images/dense-params-layer-pct.png)
-*Figure 3: Qwen3 dense models show stable ~30% layer coordination across all sizes - no phase transition*
+*figure 3: qwen3 dense models show stable ~30% layer coordination across all sizes - no phase transition*
 
 instead of seeing the phase transition Dettmers found at 6.7B, I found something completely different: stable ~30% layer coordination across ALL model sizes. no phase transition.
 
-there's a ton of potential explanations for this. there have been tons of architectural improvements between GPT-2/OPT/GPT-J models that Dettmers studied, and Qwen3. RoPE/RMSNorm/the list is long. not to mention, the smaller Qwen3 models might've just been distilled from the largest model. it's really hard to say why we didn't find the phase transition. nonetheless its not here anymore. so we probably can't use this heuristic anymore.
+its not clear what's changed between 2022 and 2025. one hypothesis is that we've had so many architectural improvements between now and 2022: RoPE, RMSNorm, new FFNs/activation functions like SwiGLU. so its hard to say what exactly might have changed the need for these outlier features. 
 
-i'm still trying to figure out what exactly to do about this. it was a cool experiment but i'm not entirely sure what the way to proceed is here. i'm still very interested in the question of 'what is the smallest effective model size for a given task', but this might look like manually sweeping over model sizes, rather than being able to just point to a number and test above/below it.
+additionally, new training datasets have become much more curated and filtered, and potentially higher signal. dettmers also found that the emergence correlated with model perplexity, not just model size. so higher quality data might have allowed models to learn feature representations that didn't require the outlier mechanism
 
-i am still curious where that outlier feature coordination went, and what it was doing. perhaps it was some sort of strange crude mechanism that worked for these smaller/weaker models, that has been subsumed by more elegant structures in modern models, as shown in Anthropic's circuit analysis blog.
+finally, it might just be the case that the 7B threshold doesn't really hold up at all. the stark difference in capabilities between models like Moondream, or Phi, at similar total parameter counts demonstrates that architecture and training data are more relevant to study than arbitrary parameter thresholds. perhaps in the past the parameter threshold alone was enough to make the distinction, with architectures and training data largely the same. but now post-training and divergent architectures make this threshold much harder to claim. 
+
+i'm still very interested in the meta question here of 'whats the least amount of compute i can use for a given task'. further research might include the perplexity study that dettmers performed, or more rigorous investigation into benchmarks to find a better way to disambiguate this fuzzy idea of an 'intelligence gap'.
 
 below are some more details on methodology, and the code is available [here](https://github.com/arb8020/research/blob/main/dev/outlier-features/README.md) for scrutiny. i'd love to get feedback/more thoughts in DMs/replies at x.com/arb8020. always happy to chat!
+
+## limitations
+
+- only tested one modern dense family: qwen3
+- could have tested more models from the same families in the MoE sweep
+- gpt-oss-20b and gpt-oss-120b were quantized with mxfp4, much more than other models studied
+- did not do the perplexity analysis from the original paper. phase transition was more gradual when plotted against perplexity so this seems like an obvious next step. perhaps there's still a phase transition that can be found by looking into that more
+- used fineweb-edu instead of C4. this study should be robust to dataset choice but thought i would mention this anyways 
 
 
 ## methodology
 
-### Detection Criteria
-- Replication of [Dettmers 2022](https://arxiv.org/abs/2208.07339) Figure 3a
-- Detected outliers with magnitude ≥6.0 affecting ≥25% of layers AND ≥6% of sequence positions
-- Analyzed activation tensors from ln_attn and ln_mlp across all layers
-- Dataset: 16 sequences × 2048 tokens from FineWeb-Edu
+### detection criteria
+- replication of [Dettmers 2022](https://arxiv.org/abs/2208.07339) Figure 3a
+- detected outliers with magnitude ≥6.0 affecting ≥25% of layers AND ≥6% of sequence positions
+- analyzed activation tensors from ln_attn and ln_mlp across all layers
+- dataset: 16 sequences × 2048 tokens from FineWeb-Edu
 
 ### MoE Models Results
 
