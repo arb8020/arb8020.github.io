@@ -19,25 +19,24 @@ in the process of getting int8 quantization to work, dettmers found what he call
 
 the intuitive explanation is that transformers have two processing streams: one that processes inputs, and one that suppresses noisy features that aren't relevant to the current context. dedicating specific hidden dimensions to feature removal means that layers can coordinate, and know which dimensions can be multiplied by large values to suppress other features. (more on this [here](https://timdettmers.com/2022/08/17/llm-int8-and-emergent-features/))
 
-to visualize this, here are some example residual streams showing how outlier features appear. these tensors are in [batch, sequence, hidden_dim] format, with typical values ranging from -3 to +3, but outlier dimensions showing values of 6-9:
+to visualize this, here's an example showing how outlier features persist through layer computations. these tensors are in [batch, sequence, hidden_dim] format, with typical values ranging from -3 to +3, but outlier dimensions showing values of 6-9:
 
 ```
-Normal residual stream (no outliers):
- 3   0   1   3    -1   1   0  -1
--1   1   1   3     2   1  -2   0
--2  -1   3  -1     2   2  -2   0
-
-With outlier in dimension 2:
+Input residual stream (dimension 2 has outliers):
 -3   0   6  -2     0   3   6   1
 -2  -3   6   1     3  -1   9  -3
 -2   0   8   3     0  -2   6  -2
 
-Layer contribution added:
+           +
+
+Layer contribution:
 -1   1   1  -1     2  -1   0  -1
 -1   1   1  -1    -2   1   0   1
  1   1   1   2     2  -2   0   2
 
-New residual stream (outlier persists):
+           =
+
+Output residual stream (outlier persists in dimension 2):
 -4   1   7  -3     2   2   6   0
 -3  -2   7   0     1   0   9  -2
 -1   1   9   5     2  -4   6   0
