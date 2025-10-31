@@ -28,31 +28,31 @@ so I ran the experiment Dettmers' did. I swept over 7 MoE models that have come 
 
 the MoE results were messy - basically no pattern. outliers ranged from 49 to 4,635, layer coordination (L%) was all over the place from 29% to 63%.
 
-![MoE Models - Total Parameters vs Layer Coverage](/assets/images/moe-total-params-layer-pct.png)
-*figure 1: no clear phase transition in MoE models when plotted by total parameters*
+![MoE Models - Total Parameters vs Layer & Sequence Coverage](/assets/images/moe_total_params_dual.png)
+*figure 1: no clear phase transition in MoE models when plotted by total parameters - both layer % (blue) and sequence % (orange) show erratic patterns*
 
-![MoE Models - Active Parameters vs Layer Coverage](/assets/images/moe-active-params-layer-pct.png)
+![MoE Models - Active Parameters vs Layer & Sequence Coverage](/assets/images/moe_active_params_dual.png)
 *figure 2: similarly messy results when plotted by active parameters*
 
 so I thought my hypothesis about the routing was most likely. but then I remembered these were also 2024-2025 models, and Dettmers was using models from 2022, basically an eternity ago. to be rigorous, I decided to run another sweep on some frontier open dense models, specifically the Qwen3 series
 
 here's where it gets interesting.
 
-![Dense Models - Parameters vs Layer Coverage](/assets/images/dense-params-layer-pct.png)
-*figure 3: qwen3 dense models show stable ~30% layer coordination across all sizes - no phase transition*
+![Dense Models - Parameters vs Layer & Sequence Coverage](/assets/images/dense_params_dual.png)
+*figure 3: qwen3 dense models show stable ~30% layer coordination (blue) and high ~66-79% sequence coverage (orange) across all sizes - no phase transition*
 
-instead of seeing the phase transition Dettmers found at 6.7B, I found something completely different: stable ~30% layer coordination across ALL model sizes. no phase transition.
+instead of seeing the phase transition Dettmers found at 6.7B, I found something completely different: stable ~30% layer coordination across ALL model sizes. no phase transition. interestingly, the sequence coverage is consistently high (~66-79%), meaning outliers affect most tokens when they appear.
 
 its not clear what's changed between 2022 and 2025. one hypothesis is that we've had so many architectural improvements between now and 2022: RoPE, RMSNorm, new FFNs/activation functions like SwiGLU. so its hard to say what exactly might have changed the need for these outlier features.
 
-additionally, new training datasets have become much more curated and filtered, and potentially higher signal. dettmers also found that the emergence correlated with model perplexity, not just model size. so higher quality data might have allowed models to learn feature representations that didn't require the outlier mechanism
+additionally, new training datasets have become much more curated and filtered, and potentially higher signal. dettmers also found that the emergence correlated with model perplexity, not just model size. so higher quality data might have allowed models to learn feature representations that didn't require the outlier mechanism.
 
-![Dense Models - Perplexity vs Layer Coverage](/assets/images/dense_perplexity_vs_layer_pct.png)
-*figure 4: plotting by perplexity instead of model size still shows the same flat ~30% pattern - no correlation between perplexity and outlier emergence*
+![Dense Models - Perplexity vs Layer & Sequence Coverage](/assets/images/dense_perplexity_dual.png)
+*figure 4: plotting by perplexity (ranging from 8.97 to 22.28) still shows the same flat patterns - layer % (blue) remains ~30-35% and sequence % (orange) stays high at ~66-79%. no correlation between perplexity and outlier emergence* 
 
 finally, it might just be the case that the 7B intelligence threshold doesn't really hold up at all. the stark difference in capabilities between models like Moondream, or Phi, at similar total parameter counts demonstrates that architecture and training data are more relevant to study than arbitrary parameter thresholds. perhaps in the past the parameter threshold alone was enough to make the distinction, with architectures and training data largely the same. but now post-training and divergent architectures make this threshold much harder to claim. 
 
-i'm still very interested in the meta question here of 'whats the least amount of compute i can use for a given task'. further research might include the perplexity study that dettmers performed, or more rigorous investigation into benchmarks to find a better way to disambiguate this fuzzy idea of an 'intelligence gap'.
+i'm still very interested in the meta question here of 'whats the least amount of compute i can use for a given task', and more mechanistic understandings of 'why does that model feel smarter than that one'. further research might include the perplexity study that dettmers performed, or more rigorous investigation into benchmarks to find a better way to disambiguate this fuzzy idea of an 'intelligence gap'. i think circuit analysis will also be relevant here, as described in https://transformer-circuits.pub/2025/attribution-graphs/biology.html#dives-addition. 
 
 below are some more details on methodology, and the code is available [here](https://github.com/arb8020/research/blob/main/dev/outlier-features/README.md) for scrutiny. i'd love to get feedback/more thoughts in DMs/replies at x.com/arb8020. always happy to chat!
 
@@ -74,15 +74,15 @@ below are some more details on methodology, and the code is available [here](htt
 
 ### MoE Models Results
 
-| Model | Total Params | Active Params | Experts | Top-K | Routing | Outliers | Mean L% | Mean S% |
-|-------|--------------|---------------|---------|-------|---------|----------|---------|---------|
-| OLMoE-1B-7B | 7B | 1.3B | 64 | 8 | Token-based (dropless) | 49 | 29.5% | 13.6% |
-| GPT-OSS-20B | 21B | 3.6B | 128* | 4* | Standard top-k | 1,465 | 38.1% | 45.4% |
-| Qwen3-30B | 30.5B | 3.3B | 128 | 8 | Standard top-k | 110 | 35.5% | 45.1% |
-| Mixtral-8x7B | 47B | 12.9B | 8 | 2 | Standard top-k | 4,635 | 50.2% | 37.4% |
-| Qwen3-Next-80B | 80B | 3.0B | 512+1 shared | 10 | Standard top-k | 504 | 57.5% | 35.1% |
-| GLM-4.5-Air | 106B | 12.0B | 128+1 shared | 8 | Sigmoid gating (loss-free balance) | 459 | 63.3% | 45.7% |
-| GPT-OSS-120B | 117B | 5.1B | 128 | 4 | Softmax-weighted top-k | 1,695 | 33.1% | 50.0% |
+| Model | Total Params | Active Params | Perplexity | Experts | Top-K | Routing | Outliers | Mean L% | Mean S% |
+|-------|--------------|---------------|------------|---------|-------|---------|----------|---------|---------|
+| OLMoE-1B-7B | 7B | 1.3B | 9.27 | 64 | 8 | Token-based (dropless) | 49 | 29.5% | 13.6% |
+| GPT-OSS-20B | 21B | 3.6B | 389.28 | 128* | 4* | Standard top-k | 1,465 | 38.1% | 45.4% |
+| Qwen3-30B | 30.5B | 3.3B | 9.10 | 128 | 8 | Standard top-k | 110 | 35.5% | 45.1% |
+| Mixtral-8x7B | 47B | 12.9B | 6.04 | 8 | 2 | Standard top-k | 4,635 | 50.2% | 37.4% |
+| Qwen3-Next-80B | 80B | 3.0B | 5.56 | 512+1 shared | 10 | Standard top-k | 504 | 57.5% | 35.1% |
+| GLM-4.5-Air | 106B | 12.0B | - | 128+1 shared | 8 | Sigmoid gating (loss-free balance) | 459 | 63.3% | 45.7% |
+| GPT-OSS-120B | 117B | 5.1B | 93.20 | 128 | 4 | Softmax-weighted top-k | 1,695 | 33.1% | 50.0% |
 
 **Metric Definitions:**
 - **L%** = avg % of layers each outlier affects
@@ -92,13 +92,13 @@ below are some more details on methodology, and the code is available [here](htt
 
 ### Dense Models Results
 
-| Model | Total Params | Outliers | Mean L% | Mean S% |
-|-------|--------------|----------|---------|---------|
-| Qwen3-0.6B | 0.6B | 9,212 | 32.7% | 66.5% |
-| Qwen3-1.7B | 1.7B | 16,563 | 30.3% | 78.4% |
-| Qwen3-4B | 4.0B | 1,042 | 34.8% | 68.8% |
-| Qwen3-8B | 8.0B | 777 | 32.3% | 70.8% |
-| Qwen3-14B | 14.0B | 985 | 31.4% | 79.0% |
+| Model | Total Params | Perplexity | Outliers | Mean L% | Mean S% |
+|-------|--------------|------------|----------|---------|---------|
+| Qwen3-0.6B | 0.6B | 22.28 | 9,212 | 32.7% | 66.5% |
+| Qwen3-1.7B | 1.7B | 17.08 | 16,563 | 30.3% | 78.4% |
+| Qwen3-4B | 4.0B | 13.59 | 1,042 | 34.8% | 68.8% |
+| Qwen3-8B | 8.0B | 10.19 | 777 | 32.3% | 70.8% |
+| Qwen3-14B | 14.0B | 8.97 | 985 | 31.4% | 79.0% |
 
 ### Model Precision Notes
 
