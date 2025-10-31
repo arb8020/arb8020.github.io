@@ -41,11 +41,14 @@ here's where it gets interesting.
 ![Dense Models - Parameters vs Layer Coverage](/assets/images/dense-params-layer-pct.png)
 *figure 3: qwen3 dense models show stable ~30% layer coordination across all sizes - no phase transition*
 
-instead of seeing the phase transition Dettmers found at 6.7B, I found something completely different: stable ~30% layer coordination across ALL model sizes. no phase transition. 
+instead of seeing the phase transition Dettmers found at 6.7B, I found something completely different: stable ~30% layer coordination across ALL model sizes. no phase transition.
 
-its not clear what's changed between 2022 and 2025. one hypothesis is that we've had so many architectural improvements between now and 2022: RoPE, RMSNorm, new FFNs/activation functions like SwiGLU. so its hard to say what exactly might have changed the need for these outlier features. 
+its not clear what's changed between 2022 and 2025. one hypothesis is that we've had so many architectural improvements between now and 2022: RoPE, RMSNorm, new FFNs/activation functions like SwiGLU. so its hard to say what exactly might have changed the need for these outlier features.
 
 additionally, new training datasets have become much more curated and filtered, and potentially higher signal. dettmers also found that the emergence correlated with model perplexity, not just model size. so higher quality data might have allowed models to learn feature representations that didn't require the outlier mechanism
+
+![Dense Models - Perplexity vs Layer Coverage](/assets/images/dense_perplexity_vs_layer_pct.png)
+*figure 4: plotting by perplexity instead of model size still shows the same flat ~30% pattern - no correlation between perplexity and outlier emergence*
 
 finally, it might just be the case that the 7B intelligence threshold doesn't really hold up at all. the stark difference in capabilities between models like Moondream, or Phi, at similar total parameter counts demonstrates that architecture and training data are more relevant to study than arbitrary parameter thresholds. perhaps in the past the parameter threshold alone was enough to make the distinction, with architectures and training data largely the same. but now post-training and divergent architectures make this threshold much harder to claim. 
 
@@ -58,7 +61,6 @@ below are some more details on methodology, and the code is available [here](htt
 - only tested one modern dense family: qwen3
 - could have tested more models from the same families in the MoE sweep
 - gpt-oss-20b and gpt-oss-120b were quantized with mxfp4, much more than other models studied
-- dettmers showed a more gradual change in validation perplexity vs parameter count, this is an obvious next target for study
 - used fineweb-edu instead of C4. this study should be robust to dataset choice but thought i would mention this anyways 
 
 
