@@ -19,6 +19,32 @@ in the process of getting int8 quantization to work, dettmers found what he call
 
 the intuitive explanation is that transformers have two processing streams: one that processes inputs, and one that suppresses noisy features that aren't relevant to the current context. dedicating specific hidden dimensions to feature removal means that layers can coordinate, and know which dimensions can be multiplied by large values to suppress other features. (more on this [here](https://timdettmers.com/2022/08/17/llm-int8-and-emergent-features/))
 
+to visualize this, here are some example residual streams showing how outlier features appear. these tensors are in [batch, sequence, hidden_dim] format, with typical values ranging from -3 to +3, but outlier dimensions showing values of 6-9:
+
+```
+Normal residual stream (no outliers):
+ 3   0   1   3    -1   1   0  -1
+-1   1   1   3     2   1  -2   0
+-2  -1   3  -1     2   2  -2   0
+
+With outlier in dimension 2:
+-3   0   6  -2     0   3   6   1
+-2  -3   6   1     3  -1   9  -3
+-2   0   8   3     0  -2   6  -2
+
+Layer contribution added:
+-1   1   1  -1     2  -1   0  -1
+-1   1   1  -1    -2   1   0   1
+ 1   1   1   2     2  -2   0   2
+
+New residual stream (outlier persists):
+-4   1   7  -3     2   2   6   0
+-3  -2   7   0     1   0   9  -2
+-1   1   9   5     2  -4   6   0
+```
+
+notice how dimension 2 (third column) maintains high values of 6-9 across all sequence positions in both batches, even after adding the layer contribution. this systematic appearance across layers and tokens is what dettmers called "layer coordination."
+
 dettmers' found that these extreme magnitude values in model residual streams started to systematically coordinate across layers around ~6.7B parameters. he called this a phase transition and claimed that 'transformers after the phase shift at 6.7B parameters behave very different to transformers before the phase shift ... one should not try to generalize from <6.7B to beyond'. this is a pretty strong claim, so I thought it would be important for my own experiments to find out how this claim held up for MoE models. 
 
 ![Dettmers Phase Transition](/assets/images/dettmers-phase-transition.png)
