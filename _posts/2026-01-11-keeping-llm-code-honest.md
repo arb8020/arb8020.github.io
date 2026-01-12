@@ -41,19 +41,19 @@ because of this, there are domains where it honestly might be easier to go write
 references:
 
 APIs and code compression
-https://caseymuratori.com/blog_0015
-https://caseymuratori.com/blog_0016
-https://caseymuratori.com/blog_0025
+- [Semantic Compression](https://caseymuratori.com/blog_0015)
+- [Complexity and Granularity](https://caseymuratori.com/blog_0016)
+- [Redundancy vs Dependencies](https://caseymuratori.com/blog_0025)
 
 system design
-https://www.seangoedecke.com/good-system-design/
+- [Good System Design](https://www.seangoedecke.com/good-system-design/)
 
 mechanical code tips to keep you out of trouble
-https://github.com/tigerbeetle/tigerbeetle/blob/main/docs/TIGER_STYLE.md
+- [Tiger Style](https://github.com/tigerbeetle/tigerbeetle/blob/main/docs/TIGER_STYLE.md)
 
 observability
-https://loggingsucks.com/
+- [Logging Sucks](https://loggingsucks.com/)
 
 code review + your responsibility with LLM code
-https://simonwillison.net/2025/Dec/18/code-proven-to-work/
-https://blog.ezyang.com/2025/12/code-review-as-human-alignment-in-the-era-of-llms/
+- [Code Proven to Work](https://simonwillison.net/2025/Dec/18/code-proven-to-work/)
+- [Code Review as Human Alignment](https://blog.ezyang.com/2025/12/code-review-as-human-alignment-in-the-era-of-llms/)
