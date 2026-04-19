@@ -77,7 +77,45 @@ export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover
         );
       })}
 
-      {/* pills — in world space */}
+      {/* TODO(remove-pills): remove all pills below in favor of gesture + right-click UX.
+          Pills are being replaced with:
+
+          RIGHT-CLICK CONTEXT MENU on box:
+          - "Translate" → opens translate input (same as current 🌐 pill)
+          - "Score density" → runs density scoring (same as current ◉ pill)
+          - "Versions" → opens versions popover (same as current ≡ pill)
+          - "Annotate" → opens annotation input (same as current ✎ pill)
+          - "Retry rewrite" → re-runs LLM at current size (same as current ↺ pill)
+          - "Tree fold" → runs tree-fold LLM (see TODO(tree-fold))
+          Implement as a fixed-position DOM menu portaled to body, same pattern as Popover.
+          Fire on onContextMenu on the box div in BoxComponent (e.preventDefault() to suppress browser menu).
+
+          RIGHT-CLICK CONTEXT MENU on empty canvas:
+          - "New box here" → addBox at click coords
+
+          GESTURE: scroll on box header = navigate versions
+          - Add onWheel handler to the header div in BoxComponent.
+          - deltaY > 0 = go to previous version (older), deltaY < 0 = go to next (newer).
+          - Show version indicator "v3/5" in the header, briefly highlighted on change.
+          - No popover needed.
+
+          GESTURE: shake box header = translate whole box
+          - Same shake detection as SpanOverlay (≥3 velocity reversals in 600ms).
+          - On shake: open translate input anchored to the box header.
+          - The header is draggable so distinguish shake (rapid oscillation) from drag (monotone).
+
+          GESTURE: click-hold on selected span = lift span as floating ghost
+          - On pointerdown on SpanOverlay canvas (when selection exists), start a 300ms timer.
+          - If pointer hasn't moved >5px and timer fires: "lift" the span — render it as a
+            small floating card that follows the pointer (absolute positioned, portaled).
+          - The lifted span shows the selected text in a card with dashed border.
+          - While lifted, shaking the card opens the translate/alternatives popover.
+          - Dropping the card (pointerup) dismisses it (no action — use the popover to act).
+
+          Keep ✎ annotation pill for now until right-click is implemented (it's the least
+          discoverable via gesture). All others can be removed once right-click lands. */}
+
+      {/* pills — kept temporarily until right-click menu replaces them */}
       <SidePill x={b.x - 44} y={b.y + 8}   label="✎" title="annotation" onClick={el => handlePillClick('annotation', el)} />
       <SidePill x={b.x - 44} y={b.y + 44}  label="↺" title="retry" onClick={() => { onRetry(); }} />
       <SidePill x={b.x - 44} y={b.y + 80}  label="≡" title="versions" onClick={el => handlePillClick('versions', el)} />

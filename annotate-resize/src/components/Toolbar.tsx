@@ -5,9 +5,11 @@ interface Props {
   onZoomReset: () => void;
   onAddBox: () => void;
   onPasteBox: () => void;
+  onExport: () => void;
+  onImport: () => void;
 }
 
-export function Toolbar({ zoom, onZoomIn, onZoomOut, onZoomReset, onAddBox, onPasteBox }: Props) {
+export function Toolbar({ zoom, onZoomIn, onZoomOut, onZoomReset, onAddBox, onPasteBox, onExport, onImport }: Props) {
   const btn: React.CSSProperties = {
     background: 'transparent', border: 'none', padding: '6px 10px',
     borderRadius: 6, cursor: 'pointer', color: 'var(--text)', fontSize: 13,
@@ -21,6 +23,9 @@ export function Toolbar({ zoom, onZoomIn, onZoomOut, onZoomReset, onAddBox, onPa
     }}>
       <button style={btn} onClick={onAddBox}>+ box</button>
       <button style={btn} onClick={onPasteBox}>paste</button>
+      <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch', margin: '4px 2px' }} />
+      <button style={btn} onClick={onExport} title="download canvas as JSON">⇪ export</button>
+      <button style={btn} onClick={onImport} title="load canvas from JSON (replaces current)">⇫ import</button>
       <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch', margin: '4px 2px' }} />
       <span style={{ color: 'var(--muted)', fontSize: 11, padding: '0 4px' }} title="hold space + drag, or middle-mouse drag">✋ space+drag</span>
       <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch', margin: '4px 2px' }} />

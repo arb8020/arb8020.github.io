@@ -146,6 +146,29 @@ export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate,
     }
   }, [box.currentVid, box.versions, box.fontSize, box.merged]); // no pendingRewrite — ghost handles that
 
+  // TODO(header-scroll-versions): add onWheel to header div to navigate versions.
+  // deltaY > 0 (scroll down) = go to previous version index; deltaY < 0 = go to next.
+  // onUpdate(b => { const idx = b.versions.findIndex(v=>v.id===b.currentVid); const next = clamp(idx + (e.deltaY>0?-1:1), 0, b.versions.length-1); return {...b, currentVid: b.versions[next].id}; })
+  // Show "v{n}/{total}" in header span, flash it briefly (opacity animation) on change.
+  // e.preventDefault() to stop the canvas from panning on header scroll.
+
+  // TODO(header-shake-translate): detect shake gesture on header drag (≥3 velocity reversals in 600ms).
+  // Distinguish from normal drag: monotone velocity = pan box, oscillating velocity = shake.
+  // On shake: fire onRunTranslateBox(register) after opening translate input anchored near box.
+  // Share shake detection logic with SpanOverlay (extract to pretext-utils or a shared hook).
+
+  // TODO(right-click-menu): add onContextMenu to the box div.
+  // e.preventDefault() to suppress browser menu.
+  // Render a fixed-position context menu portaled to body (reuse Popover pattern).
+  // Items: Translate | Score density | Versions | Annotate | Retry rewrite | Tree fold | Delete box
+  // Each fires the corresponding handler already wired in Canvas/App.
+
+  // TODO(span-lift): click-hold on SpanOverlay canvas lifts the span as a floating card.
+  // 300ms timer on pointerdown, cancel if pointer moves >5px.
+  // Lifted card: small div portaled to body, follows pointer, shows selected text, dashed border.
+  // Shaking the lifted card opens translate/alternatives popover.
+  // Pointerup drops and dismisses (the popover is the action surface, not the card itself).
+
   const handleDragHeader = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();

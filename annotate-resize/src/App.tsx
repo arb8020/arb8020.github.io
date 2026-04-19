@@ -6,11 +6,12 @@ import { Toolbar } from './components/Toolbar';
 import { Toast } from './components/Toast';
 import { SpanToolbar, ShakePopover } from './components/SpanToolbar';
 import type { Box, MergedSlot, SnapCandidate, PopoverKind, DensitySpan, AnchorCorner } from './types';
-import { loadFitMode, loadDensityTmpl, loadDensityConcept, loadDensityVisual, loadConfirmRewrite, loadStreamMode, loadSpanDiffMode } from './storage';
+import { loadFitMode, loadDensityTmpl, loadDensityConcept, loadDensityVisual, loadConfirmRewrite, loadStreamMode, loadSpanDiffMode, saveCanvas, loadCanvas } from './storage';
 import { callLLM, streamLLM } from './llm';
 import { loadTmpl, loadUserKeys } from './storage';
 import { validateTmpl, renderTmpl, includedVersionsBlock } from './template';
 
+// mutable counter for unique box ids within a session; hydrated from snapshot on mount
 let nextBoxId = 0;
 
 function makeEmptyBox(x: number, y: number): Box {
@@ -23,6 +24,10 @@ function makeEmptyBox(x: number, y: number): Box {
     annotation: '', fontSize: 14,
   };
 }
+
+// load snapshot synchronously before the first useState so initial boxes match saved state
+const __initialSnapshot = loadCanvas();
+if (__initialSnapshot) nextBoxId = __initialSnapshot.nextBoxId;
 
 function boxToSlot(b: Box): MergedSlot {
   const currentV = b.versions.find(v => v.id === b.currentVid);
@@ -47,8 +52,12 @@ export default function App() {
   const spaceDown = useRef(false);
   const panState = useRef<{ sx: number; sy: number; px: number; py: number } | null>(null);
   const selectedIdRef = useRef<string | null>(null);
-  const [boxes, setBoxes] = useState<Box[]>(() => [makeEmptyBox(120, 120)]);
-  const [selectedId, setSelectedId] = useState<string | null>(boxes[0].id);
+  const [boxes, setBoxes] = useState<Box[]>(() =>
+    __initialSnapshot && __initialSnapshot.boxes.length > 0
+      ? __initialSnapshot.boxes
+      : [makeEmptyBox(120, 120)]
+  );
+  const [selectedId, setSelectedId] = useState<string | null>(boxes[0]?.id ?? null);
   // keep ref in sync so keydown handler (inside useEffect) sees current value without stale closure
   selectedIdRef.current = selectedId;
   const [popover, setPopover] = useState<{ boxId: string; kind: PopoverKind } | null>(null);
@@ -57,6 +66,12 @@ export default function App() {
   const [zoom, setZoom] = useState(1);
   const [toasts, setToasts] = useState<{ id: number; msg: string; kind: string }[]>([]);
   const toastId = useRef(0);
+
+  // debounced autosave — 1s after last mutation
+  useEffect(() => {
+    const t = setTimeout(() => saveCanvas(boxes, nextBoxId), 1000);
+    return () => clearTimeout(t);
+  }, [boxes]);
 
   const toast = useCallback((msg: string, kind = 'err') => {
     const id = toastId.current++;
@@ -878,6 +893,42 @@ paragraph_2: ${textB}`;
     setPopover(p => (p?.boxId === boxId && p?.kind === kind) ? null : { boxId, kind });
   }, []);
 
+  const exportCanvas = useCallback(() => {
+    const snap = { version: 1, boxes, nextBoxId };
+    const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const date = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `annotate-resize-${date}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [boxes]);
+
+  const importCanvas = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed || !Array.isArray(parsed.boxes)) throw new Error('missing boxes[]');
+        if (!confirm(`Replace current canvas with ${parsed.boxes.length} boxes from "${file.name}"? Current work will be discarded.`)) return;
+        nextBoxId = typeof parsed.nextBoxId === 'number' ? parsed.nextBoxId : parsed.boxes.length;
+        setBoxes(parsed.boxes);
+        setSelectedId(parsed.boxes[0]?.id ?? null);
+        setPopover(null);
+        toast(`imported ${parsed.boxes.length} boxes`, 'ok');
+      } catch (err: any) {
+        toast(`import failed: ${err.message || err}`);
+      }
+    };
+    input.click();
+  }, [toast]);
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div style={{
@@ -984,6 +1035,8 @@ paragraph_2: ${textB}`;
           try { const t = await navigator.clipboard.readText(); if (t) addBox(t); }
           catch { toast('clipboard read failed', 'warn'); }
         }}
+        onExport={exportCanvas}
+        onImport={importCanvas}
       />
 
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} toast={toast} />

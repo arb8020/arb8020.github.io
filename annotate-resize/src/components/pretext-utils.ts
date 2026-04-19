@@ -80,11 +80,23 @@ export function spanBounds(rects: CharRect[], start: number, end: number): { x: 
 }
 
 // Get per-line rects for a span (for multi-line highlights).
-export function spanLineRects(rects: CharRect[], start: number, end: number): { x: number; y: number; w: number; h: number }[] {
+// If `text` is provided, whitespace chars are excluded from x/maxX so the
+// band hugs the glyphs like a native text selection — no trailing-space flare,
+// no leading-indent flare.
+export function spanLineRects(
+  rects: CharRect[],
+  start: number,
+  end: number,
+  text?: string,
+): { x: number; y: number; w: number; h: number }[] {
   const lines = new Map<number, { x: number; maxX: number; h: number }>();
   for (let i = start; i < end; i++) {
     const r = rects[i];
     if (!r) continue;
+    if (text !== undefined) {
+      const ch = text[i];
+      if (ch === undefined || /\s/.test(ch)) continue;
+    }
     const key = r.y;
     const existing = lines.get(key);
     if (existing) {

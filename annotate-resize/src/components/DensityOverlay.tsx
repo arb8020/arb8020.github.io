@@ -51,11 +51,16 @@ export function DensityOverlay({ text, spans, visual, width, height, fontSize, p
     const maxWidth = width - paddingLeft * 2;
     const charRects = buildCharRects(text, fontSize, maxWidth, paddingTop, paddingLeft, lineHeight);
 
+    // tight band that hugs the glyphs, like native text selection
+    const lineHeightPx = fontSize * lineHeight;
+    const bandH = fontSize * 1.2;
+    const yOffset = (lineHeightPx - bandH) / 2;
+
     for (const span of spans) {
       const color = scoreToColor(span.score, visual);
       ctx.fillStyle = color;
-      for (const lr of spanLineRects(charRects, span.start, span.end)) {
-        ctx.fillRect(lr.x - 1, lr.y + 1, lr.w + 2, lr.h - 2);
+      for (const lr of spanLineRects(charRects, span.start, span.end, text)) {
+        ctx.fillRect(lr.x, lr.y + yOffset, lr.w, bandH);
       }
     }
   }, [text, spans, visual, width, height, fontSize, paddingTop, paddingLeft, lineHeight]);

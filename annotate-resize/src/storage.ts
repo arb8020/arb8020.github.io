@@ -1,4 +1,4 @@
-import type { FitMode, DensityVisual } from './types';
+import type { Box, FitMode, DensityVisual } from './types';
 
 const K = {
   tmpl: 'ar.tmpl',
@@ -86,3 +86,42 @@ export const tail4 = (s: string) => s ? '…' + s.slice(-4) : '';
 export const getSpend = (p: string) => parseFloat(sessionStorage.getItem(K.spend(p)) || '0');
 export const addSpend = (p: string, amt: number) => sessionStorage.setItem(K.spend(p), String(getSpend(p) + amt));
 export const resetSpend = (p: string) => sessionStorage.removeItem(K.spend(p));
+
+// ---- canvas persistence --------------------------------------------------
+
+const CANVAS_KEY = 'ar.canvas';
+const CANVAS_VERSION = 1;
+
+// strip transient/in-flight fields that shouldn't survive a reload
+function cleanBox(b: Box): Box {
+  const { pendingRewrite, pendingSpanDiff, ...rest } = b;
+  const c = rest as any;
+  delete c._status;
+  delete c._shakeResult;
+  return c as Box;
+}
+
+export interface CanvasSnapshot {
+  version: number;
+  boxes: Box[];
+  nextBoxId: number;
+}
+
+export const saveCanvas = (boxes: Box[], nextBoxId: number) => {
+  const snap: CanvasSnapshot = {
+    version: CANVAS_VERSION,
+    boxes: boxes.map(cleanBox),
+    nextBoxId,
+  };
+  localStorage.setItem(CANVAS_KEY, JSON.stringify(snap));
+};
+
+export const loadCanvas = (): CanvasSnapshot | null => {
+  const raw = localStorage.getItem(CANVAS_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.boxes)) return null;
+    return parsed as CanvasSnapshot;
+  } catch { return null; }
+};
