@@ -153,6 +153,16 @@ export function GhostBox({ pending, onAccept, onReject, onToggle, fontSize }: Pr
         <CtrlBtn color="var(--accent)" title="toggle original / rewrite" onClick={onToggle}>
           {isGhostOnTop ? '⊙' : '○'}
         </CtrlBtn>
+        {/* TODO(ghost-retry): add ↺ retry button here.
+            Clicking ↺ expands a small input field inline in the controls bar:
+              [ ↺  extra instructions (optional)... ] [→ retry]
+            User can type or leave blank, then hit Enter or click →.
+            On submit: fires onRetry(instruction: string) up to App.
+            App.runResize is called again with the extra instruction appended to the prompt:
+              if (instruction) vars['extra_instruction'] = instruction;
+              and DEFAULT_TMPL gains an optional {{extra_instruction}} placeholder.
+            The new ghost replaces the old one (same ghost geometry, new text).
+            This replaces the old box-level annotation pill entirely — intent lives at point of action. */}
       </div>
     </>
   );

@@ -115,12 +115,17 @@ export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover
           Keep ✎ annotation pill for now until right-click is implemented (it's the least
           discoverable via gesture). All others can be removed once right-click lands. */}
 
-      {/* pills — kept temporarily until right-click menu replaces them */}
-      <SidePill x={b.x - 44} y={b.y + 8}   label="✎" title="annotation" onClick={el => handlePillClick('annotation', el)} />
-      <SidePill x={b.x - 44} y={b.y + 44}  label="↺" title="retry" onClick={() => { onRetry(); }} />
-      <SidePill x={b.x - 44} y={b.y + 80}  label="≡" title="versions" onClick={el => handlePillClick('versions', el)} />
-      <SidePill x={b.x - 44} y={b.y + 116} label="◉" title="density" onClick={() => onRunDensity()} />
-      <SidePill x={b.x - 44} y={b.y + 152} label="🌐" title="translate box" onClick={el => handlePillClick('translate', el)} />
+      {/* pills — kept temporarily until gesture UX replaces them.
+          ✎ annotation removed: replaced by ghost retry ↺ with optional instruction field (see GhostBox TODO).
+          ↺ retry: will move to ghost box controls.
+          ≡ versions: will move to header scroll gesture.
+          ◉ density: gesture TBD (thinking in progress).
+          🌐 translate: will move to header shake gesture.
+          🌲 tree-fold: will move to header button (see BoxComponent TODO). */}
+      <SidePill x={b.x - 44} y={b.y + 8}   label="↺" title="retry" onClick={() => { onRetry(); }} />
+      <SidePill x={b.x - 44} y={b.y + 44}  label="≡" title="versions" onClick={el => handlePillClick('versions', el)} />
+      <SidePill x={b.x - 44} y={b.y + 80}  label="◉" title="density" onClick={() => onRunDensity()} />
+      <SidePill x={b.x - 44} y={b.y + 116} label="🌐" title="translate box" onClick={el => handlePillClick('translate', el)} />
       {/* TODO(span-mini-toolbar): when user has text selected inside this box's textarea,
           show a floating mini-toolbar positioned near the selection.
           Implementation:

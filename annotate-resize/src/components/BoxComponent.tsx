@@ -146,6 +146,15 @@ export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate,
     }
   }, [box.currentVid, box.versions, box.fontSize, box.merged]); // no pendingRewrite — ghost handles that
 
+  // TODO(tree-fold-header): add a small fold/unfold button in the header (🌲 or ⊞).
+  // Click → fires runTreeFold(boxId): LLM reformats text verbatim as Markdown outline tree.
+  // Prompt: "Copy the following content verbatim, format as a tree using outline (- <text>)
+  //   notation. Output Markdown. Do not summarize, modify, or editorialize.\n\n{{text}}"
+  // Result pushed as new version. Box renders Markdown (detect if currentVid text starts with "- " or "#").
+  // Button label toggles between 🌲 (fold) and ⊟ (unfold) based on whether current version is tree.
+  // Clicking again while in tree view → restores previous non-tree version (just switch currentVid back).
+  // Future: click individual tree nodes to collapse/expand subtrees inline.
+
   // TODO(header-scroll-versions): add onWheel to header div to navigate versions.
   // deltaY > 0 (scroll down) = go to previous version index; deltaY < 0 = go to next.
   // onUpdate(b => { const idx = b.versions.findIndex(v=>v.id===b.currentVid); const next = clamp(idx + (e.deltaY>0?-1:1), 0, b.versions.length-1); return {...b, currentVid: b.versions[next].id}; })
