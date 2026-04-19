@@ -10,6 +10,7 @@ interface Props {
   onUpdate: (updater: (b: Box) => Box) => void;
   onStartResize: (dir: string, e: React.PointerEvent) => void;
   onRetry: () => void;
+  onRunDensity: () => void;
 }
 
 const PAD = 4;
@@ -30,7 +31,7 @@ const CURSORS: Record<string, string> = {
   t: 'ns-resize', b: 'ns-resize', l: 'ew-resize', r: 'ew-resize',
 };
 
-export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover, onUpdate, onStartResize, onRetry }: Props) {
+export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover, onUpdate, onStartResize, onRetry, onRunDensity }: Props) {
   const b = box;
   // screen-space rect of the active pill, used to position the portal popover
   const [pillRect, setPillRect] = useState<DOMRect | null>(null);
@@ -61,11 +62,12 @@ export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover
         const sw = kind === 'corner' ? 10 : kind === 'edge-h' ? 14 : 6;
         const sh = kind === 'corner' ? 10 : kind === 'edge-h' ? 6 : 14;
         return (
-          <div key={dir} style={{
+          <div key={dir} title={kind === 'corner' ? 'drag to resize + rewrite' : 'drag to resize'} style={{
             position: 'absolute', zIndex: 21,
             left: hx - sw / 2, top: hy - sh / 2,
             width: sw, height: sh,
-            background: '#fff', border: '1.5px solid var(--accent)',
+            background: kind === 'corner' ? 'var(--accent)' : '#fff',
+            border: '1.5px solid var(--accent)',
             borderRadius: kind === 'corner' ? '50%' : 3,
             cursor: CURSORS[dir], pointerEvents: 'auto',
           }}
@@ -78,6 +80,20 @@ export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover
       <SidePill x={b.x - 44} y={b.y + 8}   label="✎" title="annotation" onClick={el => handlePillClick('annotation', el)} />
       <SidePill x={b.x - 44} y={b.y + 44}  label="↺" title="retry" onClick={() => { onRetry(); }} />
       <SidePill x={b.x - 44} y={b.y + 80}  label="≡" title="versions" onClick={el => handlePillClick('versions', el)} />
+      <SidePill x={b.x - 44} y={b.y + 116} label="◉" title="density" onClick={() => onRunDensity()} />
+      {/* TODO(tree-fold): add 🌲 pill at y+152. Calls runTreeFold(boxId).
+          LLM reformats text verbatim as Markdown outline tree (no summarization).
+          Prompt: "Copy the following content verbatim, format as a tree using outline (- <text>) notation.
+          Output Markdown. Do not summarize, modify, or editorialize.\n\n{{text}}"
+          Result is a new version. Box detects if currentVid text is Markdown and renders accordingly.
+          Future: click to collapse/expand individual tree nodes inline. */}
+      {/* TODO(translate): add 🌐 pill at y+224. Opens popover with single text input "translate to / rewrite as".
+          User types anything: "portuguese", "pirate speak", "linkedin", "ELI5".
+          Prompt: "Rewrite the following text as {{register}}. Preserve meaning. Reply with rewritten text only.\n\ntext: {{text}}"
+          On submit: callLLM, push new version. No new infrastructure needed — same version model as resize. */}
+      {/* TODO(annotate): add 💬 pill at y+260. Opens annotation input bar.
+          Triggers LLM annotation+diff mode (see TODO in App.tsx runAnnotation).
+          Pill should highlight blue when annotation session is active on this box. */}
 
       {/* popovers — portaled to body so position:fixed works correctly outside the transform */}
       {popover === 'annotation' && pillRect && createPortal(

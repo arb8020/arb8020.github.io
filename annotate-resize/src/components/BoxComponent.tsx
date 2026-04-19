@@ -1,35 +1,104 @@
 import { useRef, useEffect, useCallback } from 'react';
 import type { RefObject } from 'react';
 import type { PanzoomObject } from '@panzoom/panzoom';
-import type { Box, FitMode } from '../types';
+import type { Box, FitMode, SnapCandidate } from '../types';
+import { DensityOverlay } from './DensityOverlay';
+
+const SNAP_THRESHOLD = 28; // world coords
 
 interface Props {
   box: Box;
   isSelected: boolean;
+  allBoxes: Box[];
   panzoomRef?: RefObject<PanzoomObject | null>;
   onSelect: () => void;
   onUpdate: (updater: (b: Box) => Box) => void;
   onRunResize: (area: number) => void;
   fitMode: FitMode;
   worldDelta: (dx: number, dy: number) => { dx: number; dy: number };
+  onSnapCandidate: (c: SnapCandidate | null) => void;
+  onSnap: (dragged: Box, candidate: SnapCandidate) => void;
+  onScissor: () => void;
+  onStitch: () => void;
+  registerFit: (fn: () => void) => void;
 }
 
-export function BoxComponent({ box, isSelected: _, onSelect, onUpdate, fitMode, worldDelta }: Props) {
-  const taRef = useRef<HTMLTextAreaElement>(null);
+// Returns the 4 edge midpoints of a box in world coords
+function edgeMidpoints(b: Box): Record<'T' | 'B' | 'L' | 'R', [number, number]> {
+  return {
+    T: [b.x + b.w / 2, b.y],
+    B: [b.x + b.w / 2, b.y + b.h],
+    L: [b.x, b.y + b.h / 2],
+    R: [b.x + b.w, b.y + b.h / 2],
+  };
+}
 
-  // fit helpers
-  const fitGrow = useCallback(() => {
+const OPPOSITE: Record<'T' | 'B' | 'L' | 'R', 'T' | 'B' | 'L' | 'R'> = { T: 'B', B: 'T', L: 'R', R: 'L' };
+const EDGE_AXIS: Record<'T' | 'B' | 'L' | 'R', 'v' | 'h'> = { T: 'v', B: 'v', L: 'h', R: 'h' };
+
+function dist([ax, ay]: [number, number], [bx, by]: [number, number]) {
+  return Math.hypot(ax - bx, ay - by);
+}
+
+function computeGhost(dragged: Box, target: Box, dragEdge: 'T' | 'B' | 'L' | 'R', axis: 'v' | 'h'): { ghostX: number; ghostY: number; ghostW: number; ghostH: number } {
+  if (axis === 'v') {
+    const w = Math.max(dragged.w, target.w);
+    const h = dragged.h + target.h;
+    const x = Math.min(dragged.x, target.x);
+    const y = dragEdge === 'B' ? target.y : dragged.y; // dragged below target → target on top
+    return { ghostX: x, ghostY: y, ghostW: w, ghostH: h };
+  } else {
+    const h = Math.max(dragged.h, target.h);
+    const w = dragged.w + target.w;
+    const x = dragEdge === 'R' ? target.x : dragged.x;
+    const y = Math.min(dragged.y, target.y);
+    return { ghostX: x, ghostY: y, ghostW: w, ghostH: h };
+  }
+}
+
+export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate, fitMode, worldDelta, onSnapCandidate, onSnap, onScissor, onStitch, registerFit }: Props) {
+  const taRefA = useRef<HTMLTextAreaElement>(null);
+  const taRefB = useRef<HTMLTextAreaElement>(null);
+
+  // register fit fn with Canvas so edge resize can trigger it explicitly
+  useEffect(() => {
+    registerFit(() => autoFit(taRefA));
+  // registerFit is stable (ref setter), autoFit changes with fitMode — re-register when fitMode changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitMode]);
+
+  const fitWiden = useCallback((taRef: React.RefObject<HTMLTextAreaElement | null>) => {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.fontSize = '14px';
-    ta.style.height = 'auto';
-    const needed = ta.scrollHeight;
-    ta.style.height = '';
-    const newH = Math.max(80, needed + 22 + 2);
-    onUpdate(b => ({ ...b, h: newH, fontSize: 14 }));
-  }, [onUpdate]);
+    const minW = 120, maxW = 1200;
+    const availH = box.h - 22;
+    // binary search minimum width where content fits without scrolling
+    let lo = minW, hi = maxW;
+    while (hi - lo > 4) {
+      const mid = Math.round((lo + hi) / 2);
+      ta.style.width = mid + 'px';
+      if (ta.scrollHeight <= availH) { hi = mid; } else { lo = mid; }
+    }
+    ta.style.width = '';
+    ta.scrollTop = 0;
+    const newW = Math.min(maxW, hi + 2);
 
-  const fitShrink = useCallback(() => {
+    if (newW >= maxW) {
+      // couldn't fit at max width — grow height at maxW
+      ta.style.width = maxW + 'px';
+      ta.style.height = '1px';
+      const needed = ta.scrollHeight;
+      ta.style.height = '';
+      ta.style.width = '';
+      const newH = Math.max(80, needed + 22 + 2);
+      onUpdate(b => ({ ...b, w: maxW, h: newH, fontSize: 14 }));
+    } else if (newW !== box.w) {
+      onUpdate(b => ({ ...b, w: newW, fontSize: 14 }));
+    }
+  }, [box.w, box.h, onUpdate]);
+
+  const fitShrink = useCallback((taRef: React.RefObject<HTMLTextAreaElement | null>) => {
     const ta = taRef.current;
     if (!ta) return;
     let lo = 6, hi = 20, best = 6;
@@ -44,41 +113,108 @@ export function BoxComponent({ box, isSelected: _, onSelect, onUpdate, fitMode, 
     onUpdate(b => ({ ...b, fontSize: fs }));
   }, [onUpdate]);
 
-  const autoFit = useCallback(() => {
-    if (fitMode === 'shrink') requestAnimationFrame(fitShrink);
-    else fitGrow();
-  }, [fitMode, fitGrow, fitShrink]);
+  const autoFit = useCallback((taRef: React.RefObject<HTMLTextAreaElement | null>) => {
+    if (fitMode === 'shrink') requestAnimationFrame(() => fitShrink(taRef));
+    else requestAnimationFrame(() => fitWiden(taRef));
+  }, [fitMode, fitWiden, fitShrink]);
 
-  // sync textarea value when currentVid changes
+  // sync textarea value when the active version text changes (version switch, LLM result landing)
+  // autoFit is called explicitly at the callsite that changes text — not reactively here
   useEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    const v = box.versions.find(x => x.id === box.currentVid);
-    const text = v ? v.text : '';
-    if (ta.value !== text) { ta.value = text; ta.style.fontSize = box.fontSize + 'px'; }
-  }, [box.currentVid, box.versions, box.fontSize]);
+    if (box.merged && !box.merged.stitched) {
+      const va = box.merged.slotA.versions.find(x => x.id === box.merged!.slotA.currentVid);
+      const vb = box.merged.slotB.versions.find(x => x.id === box.merged!.slotB.currentVid);
+      if (taRefA.current) taRefA.current.value = va?.text ?? '';
+      if (taRefB.current) taRefB.current.value = vb?.text ?? '';
+    } else {
+      const ta = taRefA.current;
+      if (!ta) return;
+      const text = box.versions.find(x => x.id === box.currentVid)?.text ?? '';
+      if (ta.value !== text) {
+        ta.value = text;
+        ta.style.fontSize = box.fontSize + 'px';
+        ta.scrollTop = 0;
+        autoFit(taRefA);
+      }
+    }
+  }, [box.currentVid, box.versions, box.fontSize, box.merged]); // no pendingRewrite — ghost handles that
 
   const handleDragHeader = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     const start = { x: e.clientX, y: e.clientY, bx: box.x, by: box.y };
+    let lastCandidate: SnapCandidate | null = null;
+
     const move = (ev: PointerEvent) => {
       const { dx, dy } = worldDelta(ev.clientX - start.x, ev.clientY - start.y);
-      onUpdate(b => ({ ...b, x: start.bx + dx, y: start.by + dy }));
+      const nx = start.bx + dx, ny = start.by + dy;
+      onUpdate(b => ({ ...b, x: nx, y: ny }));
+
+      // snap detection — compare edge midpoints of moved box against all other boxes
+      const movedBox = { ...box, x: nx, y: ny };
+      const myEdges = edgeMidpoints(movedBox);
+      let best: SnapCandidate | null = null;
+      let bestDist = SNAP_THRESHOLD;
+
+      for (const target of allBoxes) {
+        if (target.id === box.id || target.merged) continue; // don't snap to merged boxes
+        const theirEdges = edgeMidpoints(target);
+        for (const dragEdge of ['T', 'B', 'L', 'R'] as const) {
+          const targetEdge = OPPOSITE[dragEdge];
+          const d = dist(myEdges[dragEdge], theirEdges[targetEdge]);
+          if (d < bestDist) {
+            bestDist = d;
+            const axis = EDGE_AXIS[dragEdge];
+            best = {
+              targetId: target.id,
+              dragEdge, targetEdge, axis,
+              ...computeGhost(movedBox, target, dragEdge, axis),
+            };
+          }
+        }
+      }
+
+      if (best?.targetId !== lastCandidate?.targetId || best?.dragEdge !== lastCandidate?.dragEdge) {
+        lastCandidate = best;
+        onSnapCandidate(best);
+      }
     };
+
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      if (lastCandidate) {
+        onSnap(box, lastCandidate);
+        onSnapCandidate(null);
+      } else {
+        onSnapCandidate(null);
+      }
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   };
 
-  const handleInput = () => {
+  const handleInput = (slot: 'A' | 'B') => {
+    const taRef = slot === 'A' ? taRefA : taRefB;
     const ta = taRef.current;
     if (!ta) return;
     const text = ta.value;
+    autoFit(taRef);
+
+    if (box.merged && !box.merged.stitched) {
+      onUpdate(b => {
+        if (!b.merged) return b;
+        const slotKey = slot === 'A' ? 'slotA' : 'slotB';
+        const slotData = b.merged[slotKey];
+        const versions = slotData.versions.map(v =>
+          v.id === slotData.currentVid ? { ...v, text } : v
+        );
+        return { ...b, merged: { ...b.merged, [slotKey]: { ...slotData, versions } } };
+      });
+      return;
+    }
+
     onUpdate(b => {
       if (b.versions.length === 0 && text.trim()) {
         return { ...b, versions: [{ id: 'v0', text, parentId: null, targetPct: 1, included: true, annotation: '' }],
@@ -92,14 +228,15 @@ export function BoxComponent({ box, isSelected: _, onSelect, onUpdate, fitMode, 
     });
   };
 
-  const handlePaste = () => {
+  const handlePaste = (slot: 'A' | 'B') => {
+    const taRef = slot === 'A' ? taRefA : taRefB;
     requestAnimationFrame(() => {
-      handleInput();
-      autoFit();
+      handleInput(slot);
+      autoFit(taRef);
     });
   };
 
-  // pan with panzoom on middle-mouse / space+drag on the viewport — nothing needed here
+  const isVertical = !box.merged || box.merged.axis === 'v';
 
   return (
     <div
@@ -118,26 +255,116 @@ export function BoxComponent({ box, isSelected: _, onSelect, onUpdate, fitMode, 
           height: 22, padding: '0 8px', display: 'flex', alignItems: 'center', gap: 6,
           background: 'var(--panel-2)', borderBottom: '1px solid var(--border)',
           cursor: 'grab', userSelect: 'none', fontSize: 11, color: 'var(--muted)',
+          flexShrink: 0,
         }}
         onPointerDown={handleDragHeader}
       >
         <span>{box.id}</span>
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--muted)' }}>
-          {(box as any)._status || ''}
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: box.pendingRewrite ? 'var(--accent)' : 'var(--muted)' }}>
+          {box.pendingRewrite ? 'review rewrite' : ((box as any)._status || '')}
         </span>
       </div>
-      <textarea
-        ref={taRef}
-        className="main"
-        placeholder="paste or type text…"
-        style={{
-          flex: 1, width: '100%', border: 'none', outline: 'none', resize: 'none',
-          padding: '10px 12px', background: 'transparent', color: 'var(--text)',
-          font: `${box.fontSize}px/1.5 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif`,
-        }}
-        onInput={handleInput}
-        onPaste={handlePaste}
-      />
+
+      {box.merged && !box.merged.stitched ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: isVertical ? 'column' : 'row', overflow: 'hidden' }}>
+          <textarea
+            ref={taRefA}
+            className="main"
+            style={taStyle(box.fontSize)}
+            onInput={() => handleInput('A')}
+            onPaste={() => handlePaste('A')}
+          />
+          <SeamBar axis={box.merged.axis} onScissor={onScissor} onStitch={onStitch} />
+          <textarea
+            ref={taRefB}
+            className="main"
+            style={taStyle(box.fontSize)}
+            onInput={() => handleInput('B')}
+            onPaste={() => handlePaste('B')}
+          />
+        </div>
+      ) : (
+        <>
+          {box.density && (
+            <DensityOverlay
+              text={(() => { const v = box.versions.find(x => x.id === box.currentVid); return v?.text ?? ''; })()}
+              spans={box.density.spans}
+              visual={box.density.visual}
+              width={box.w}
+              height={box.h}
+              fontSize={box.fontSize}
+            />
+          )}
+          <textarea
+            ref={taRefA}
+            className="main"
+            placeholder="paste or type text…"
+            style={{ ...taStyle(box.fontSize), position: 'relative', zIndex: 1, background: 'transparent' }}
+            onInput={() => handleInput('A')}
+            onPaste={() => handlePaste('A')}
+          />
+        </>
+      )}
     </div>
+  );
+}
+
+
+function taStyle(fontSize: number): React.CSSProperties {
+  return {
+    flex: 1, width: '100%', border: 'none', outline: 'none', resize: 'none',
+    padding: '10px 12px', background: 'transparent', color: 'var(--text)',
+    font: `${fontSize}px/1.5 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif`,
+    minHeight: 0,
+  };
+}
+
+function SeamBar({ axis, onScissor, onStitch }: { axis: 'v' | 'h'; onScissor: () => void; onStitch: () => void }) {
+  const isV = axis === 'v';
+  return (
+    <div style={{
+      flexShrink: 0,
+      position: 'relative',
+      display: 'flex',
+      flexDirection: isV ? 'row' : 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      [isV ? 'height' : 'width']: 1,
+      [isV ? 'width' : 'height']: '100%',
+      // the dashed line itself
+      borderTop: isV ? '1.5px dashed var(--border)' : 'none',
+      borderLeft: !isV ? '1.5px dashed var(--border)' : 'none',
+      overflow: 'visible',
+      zIndex: 2,
+      userSelect: 'none',
+    }}>
+      {/* icons float centered on the line */}
+      <div style={{
+        position: 'absolute',
+        display: 'flex',
+        flexDirection: isV ? 'row' : 'column',
+        alignItems: 'center',
+        gap: 6,
+        background: 'var(--panel)',
+        padding: isV ? '0 4px' : '4px 0',
+      }}>
+        <SeamBtn title="split back into two boxes" onClick={onScissor}>✂</SeamBtn>
+        <SeamBtn title="stitch into one paragraph" onClick={onStitch}>≋</SeamBtn>
+      </div>
+    </div>
+  );
+}
+
+function SeamBtn({ title, onClick, children }: { title: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      title={title}
+      onPointerDown={e => { e.stopPropagation(); onClick(); }}
+      style={{
+        background: 'transparent', border: 'none', cursor: 'pointer',
+        fontSize: 14, color: 'var(--muted)', padding: '0 2px', lineHeight: 1,
+        display: 'flex', alignItems: 'center',
+      }}
+    >{children}</button>
   );
 }

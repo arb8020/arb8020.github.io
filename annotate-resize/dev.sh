@@ -96,4 +96,4 @@ echo "  │  stop:    tmux kill-session -t $SESSION     │"
 echo "  └─────────────────────────────────────────────┘"
 echo ""
 
-tmux attach -t "$SESSION"
+[[ "${1:-}" != "--no-attach" ]] && tmux attach -t "$SESSION"

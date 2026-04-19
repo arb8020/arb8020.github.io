@@ -239,13 +239,19 @@ export function Sidebar({ open, onClose, toast }: Props) {
       </div>
 
       {/* fit mode */}
-      <h4 style={h4}>Box sizing (on paste / rewrite)</h4>
-      <div style={{ display: 'flex', gap: 16 }}>
-        {(['grow', 'shrink'] as FitMode[]).map(m => (
-          <label key={m} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <input type="radio" name="fitMode" value={m} checked={fitMode === m} onChange={() => onFitModeChange(m)} />
-            {m === 'grow' ? 'grow box to fit text' : 'shrink text to fit box'}
-          </label>
+      <h4 style={h4}>Overflow strategy</h4>
+      <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)', width: 'fit-content' }}>
+        {([['widen', 'widen box'], ['shrink', 'shrink text']] as [FitMode, string][]).map(([m, label]) => (
+          <button
+            key={m}
+            onClick={() => onFitModeChange(m)}
+            style={{
+              padding: '5px 12px', border: 'none', cursor: 'pointer', fontSize: 12,
+              background: fitMode === m ? 'var(--accent)' : 'var(--panel-2)',
+              color: fitMode === m ? '#fff' : 'var(--text)',
+              fontWeight: fitMode === m ? 600 : 400,
+            }}
+          >{label}</button>
         ))}
       </div>
 
