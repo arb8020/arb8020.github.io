@@ -37,8 +37,40 @@ export function SpanToolbar({ boxId, start, end, screenX, screenY, onTranslate, 
             <Btn title="shake — get alternatives" onClick={() => { onShake(boxId, start, end); onDismiss(); }}>〜</Btn>
             {/* TODO(span-lock): add 🔒 lock button */}
             {/* TODO(span-strikethrough): add S̶ strikethrough button */}
-            {/* TODO(span-resize): add ⟺ resize button with slider */}
             {/* TODO(annotate): add 💬 annotate button */}
+
+            {/* TODO(shake): 〜 button triggers shake gesture UX.
+                "Shake" means the user physically shakes the highlighted span to get alternatives.
+                Implementation:
+                1. When 〜 is clicked, render a pretext-positioned highlight rect over the span
+                   (same canvas overlay as DensityOverlay, but a single colored rect for [start,end]).
+                2. The highlight rect is draggable left/right. Track pointermove on it.
+                3. Detect shake gesture: velocity direction changes >= 3 times within 400ms.
+                   Use a ring buffer of (timestamp, x) samples; count zero-crossings of velocity.
+                4. On shake detected: fire runShakeSpan(boxId, start, end), highlight rect pulses
+                   briefly (scale animation), then alternatives popover appears.
+                5. If user just drags without shaking, cancel and dismiss.
+                The highlight rect is positioned via pretext charRects (same as DensityOverlay).
+                It should be a semi-transparent colored underline/background, not a full overlay. */}
+
+            {/* TODO(span-resize): drag left/right handles on highlighted span to resize it.
+                Implementation:
+                1. Same pretext highlight rect as shake — render the span boundary.
+                2. Add two small drag handles at the left and right edges of the selection rect.
+                3. Dragging left handle moves start offset; dragging right moves end offset.
+                   Update selectionStart/End on the textarea as handles move.
+                4. On handle release: fire runSpanResize(boxId, newStart, newEnd, targetPct)
+                   where targetPct = newSpanWidth / origSpanWidth (proportional to drag distance).
+                5. Result uses span diff rendering (see below). */}
+
+            {/* TODO(span-diff): span-level rewrites (translate span, span resize) should render
+                result inline rather than in a separate ghost box. Three modes (settings toggle):
+                - google-docs: red strikethrough over original span + green insertion after,
+                  rendered via pretext canvas overlay. Accept/reject per span via floating buttons.
+                - code-diff: original in red block, new in green block, shown below the span.
+                - ghost: small floating box near the span (reuses GhostBox but anchored to span pos).
+                Default: google-docs mode. All modes use same accept/reject flow: accept splices
+                new text at [start, end], push new version; reject clears pending span diff. */}
           </>
         ) : (
           <>

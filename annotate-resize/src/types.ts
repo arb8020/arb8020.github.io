@@ -46,6 +46,7 @@ export interface Box {
   merged?: MergedState; // present only on merged boxes
   density?: DensityState; // present after density scoring
   pendingRewrite?: PendingRewrite;
+  pendingSpanDiff?: PendingSpanDiff;
 
   // TODO(span-ops): add to Box:
   //   lockedSpans?: LockedSpan[]   — spans excluded from LLM rewrites
@@ -101,6 +102,18 @@ export interface PendingRewrite {
 export type FitMode = 'widen' | 'shrink'; // widen: box grows width to fit; shrink: font shrinks to fit
 export type PopoverKind = 'annotation' | 'versions' | 'translate' | null;
 export type DensityVisual = 'heatmap' | 'opacity';
+export type SpanDiffMode = 'google-docs' | 'code-diff' | 'ghost';
+
+// The textarea contains: ...before... + originalText + newText + ...after...
+// strikeStart..strikeEnd = originalText region (red strikethrough)
+// strikeEnd..insertEnd   = newText region (green highlight)
+// Accept: remove [strikeStart..strikeEnd], leave newText. Reject: remove [strikeEnd..insertEnd], leave original.
+export interface PendingSpanDiff {
+  strikeStart: number;
+  strikeEnd: number;
+  insertEnd: number;
+  mode: SpanDiffMode;
+}
 
 export interface DensitySpan {
   start: number; // char offset

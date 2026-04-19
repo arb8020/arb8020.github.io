@@ -3,6 +3,8 @@ import type { RefObject } from 'react';
 import type { PanzoomObject } from '@panzoom/panzoom';
 import type { Box, FitMode, SnapCandidate } from '../types';
 import { DensityOverlay } from './DensityOverlay';
+import { SpanOverlay } from './SpanOverlay';
+import { prepareRichInline, walkRichInlineLineRanges } from '@chenglou/pretext/rich-inline';
 
 const SNAP_THRESHOLD = 28; // world coords
 
@@ -22,6 +24,10 @@ interface Props {
   onStitch: () => void;
   registerFit: (fn: () => void) => void;
   onSpanSelected: (start: number, end: number, screenX: number, screenY: number) => void;
+  activeSpan?: { start: number; end: number; shakeActive?: boolean };
+  onShakeDetected?: () => void;
+  onAcceptSpanDiff?: () => void;
+  onRejectSpanDiff?: () => void;
 }
 
 // Returns the 4 edge midpoints of a box in world coords
@@ -57,7 +63,7 @@ function computeGhost(dragged: Box, target: Box, dragEdge: 'T' | 'B' | 'L' | 'R'
   }
 }
 
-export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate, fitMode, worldDelta, onSnapCandidate, onSnap, onScissor, onStitch, registerFit, onSpanSelected }: Props) {
+export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate, fitMode, worldDelta, onSnapCandidate, onSnap, onScissor, onStitch, registerFit, onSpanSelected, activeSpan, onShakeDetected, onAcceptSpanDiff, onRejectSpanDiff }: Props) {
   const taRefA = useRef<HTMLTextAreaElement>(null);
   const taRefB = useRef<HTMLTextAreaElement>(null);
 
@@ -303,6 +309,21 @@ export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate,
               fontSize={box.fontSize}
             />
           )}
+          {(activeSpan || box.pendingSpanDiff) && (
+            <SpanOverlay
+              text={(() => { const v = box.versions.find(x => x.id === box.currentVid); return v?.text ?? ''; })()}
+              fontSize={box.fontSize}
+              width={box.w}
+              height={box.h}
+              selectionStart={activeSpan?.start}
+              selectionEnd={activeSpan?.end}
+              shakeActive={activeSpan?.shakeActive}
+              onShakeDetected={onShakeDetected}
+              pendingDiff={box.pendingSpanDiff}
+              onAcceptDiff={onAcceptSpanDiff}
+              onRejectDiff={onRejectSpanDiff}
+            />
+          )}
           <textarea
             ref={taRefA}
             className="main"
@@ -314,16 +335,16 @@ export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate,
               const ta = e.currentTarget;
               const { selectionStart: s, selectionEnd: end } = ta;
               if (s !== null && end !== null && s !== end) {
-                const rect = ta.getBoundingClientRect();
-                onSpanSelected(s, end, rect.left + rect.width / 2, rect.top);
+                const pos = getSelectionScreenPos(ta, s, end, box.fontSize);
+                onSpanSelected(s, end, pos.x, pos.y);
               }
             }}
             onKeyUp={e => {
               const ta = e.currentTarget;
               const { selectionStart: s, selectionEnd: end } = ta;
               if (s !== null && end !== null && s !== end) {
-                const rect = ta.getBoundingClientRect();
-                onSpanSelected(s, end, rect.left + rect.width / 2, rect.top);
+                const pos = getSelectionScreenPos(ta, s, end, box.fontSize);
+                onSpanSelected(s, end, pos.x, pos.y);
               }
             }}
           />
@@ -333,6 +354,61 @@ export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate,
   );
 }
 
+
+// Use pretext to find the screen position of a character offset in a textarea.
+// Returns {x, y} where y is the TOP of the selection's first line (for placing toolbar above).
+function getSelectionScreenPos(ta: HTMLTextAreaElement, start: number, end: number, fontSize: number): { x: number; y: number } {
+  const rect = ta.getBoundingClientRect();
+  const paddingLeft = 12, paddingTop = 10;
+  const lineHeightPx = fontSize * 1.5;
+  const maxWidth = rect.width - paddingLeft * 2;
+  const text = ta.value;
+
+  try {
+    const font = `${fontSize}px -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif`;
+    const lines = text.split('\n');
+    let charOffset = 0, lineY = paddingTop;
+
+    for (const line of lines) {
+      if (line.length === 0) { charOffset += 1; lineY += lineHeightPx; continue; }
+      const tokens = line.match(/(\S+|\s+)/g) || [];
+      const offsets: number[] = [];
+      let pos = 0;
+      for (const t of tokens) { offsets.push(pos); pos += t.length; }
+      const items = tokens.map(t => ({ text: t, font }));
+      const prepared = prepareRichInline(items);
+      let found = false;
+      let selStartX = paddingLeft, selEndX = paddingLeft;
+      walkRichInlineLineRanges(prepared, maxWidth, (layoutLine: any) => {
+        let curX = paddingLeft;
+        for (const frag of layoutLine.fragments) {
+          curX += frag.gapBefore;
+          const fragStart = charOffset + offsets[frag.itemIndex];
+          const fragEnd = fragStart + tokens[frag.itemIndex].length;
+          const charW = frag.occupiedWidth / Math.max(1, tokens[frag.itemIndex].length);
+          if (fragStart <= start && start < fragEnd) {
+            selStartX = curX + (start - fragStart) * charW;
+            found = true;
+          }
+          if (fragStart <= end && end <= fragEnd) {
+            selEndX = curX + (end - fragStart) * charW;
+          }
+          curX += frag.occupiedWidth;
+        }
+        if (!found) lineY += lineHeightPx;
+      });
+      if (found) {
+        const midX = rect.left + (selStartX + selEndX) / 2 - ta.scrollLeft;
+        const topY = rect.top + lineY - ta.scrollTop;
+        return { x: midX, y: topY };
+      }
+      charOffset += line.length + 1;
+    }
+  } catch { /* fall through to approximation */ }
+
+  // fallback: center of textarea top
+  return { x: rect.left + rect.width / 2, y: rect.top };
+}
 
 function taStyle(fontSize: number): React.CSSProperties {
   return {

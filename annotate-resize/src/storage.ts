@@ -67,6 +67,8 @@ export const loadResizeTolerance = () => parseFloat(localStorage.getItem(K.resiz
 export const saveResizeTolerance = (v: number) => localStorage.setItem(K.resizeTolerance, String(v));
 export const loadConfirmRewrite = (): boolean => localStorage.getItem('ar.confirmRewrite') !== 'false'; // default on
 export const saveConfirmRewrite = (v: boolean) => localStorage.setItem('ar.confirmRewrite', String(v));
+export const loadSpanDiffMode = (): import('./types').SpanDiffMode => (localStorage.getItem('ar.spanDiffMode') as import('./types').SpanDiffMode) || 'google-docs';
+export const saveSpanDiffMode = (v: import('./types').SpanDiffMode) => localStorage.setItem('ar.spanDiffMode', v);
 
 export const loadStreamMode = (): boolean => localStorage.getItem('ar.streamMode') !== 'false'; // default on
 export const saveStreamMode = (v: boolean) => localStorage.setItem('ar.streamMode', String(v));

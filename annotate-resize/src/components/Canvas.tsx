@@ -25,12 +25,16 @@ interface Props {
   onToggleRewriteTop: (boxId: string) => void;
   onSpanSelected: (boxId: string, start: number, end: number, screenX: number, screenY: number) => void;
   onRunTranslateBox: (boxId: string, register: string) => void;
+  activeSpan: { boxId: string; start: number; end: number; shakeActive?: boolean } | null;
+  onShakeDetected: (boxId: string) => void;
+  onAcceptSpanDiff: (boxId: string) => void;
+  onRejectSpanDiff: (boxId: string) => void;
   fitMode: FitMode;
   toast: (msg: string, kind?: string) => void;
 }
 
 export function Canvas({ boxes, selectedId, popover, panzoomRef, onSelect, onUpdateBox,
-                         onTogglePopover, onClosePopover, onRunResize, onMerge, onScissor, onStitch, onRunDensity, onAcceptRewrite, onRejectRewrite, onToggleRewriteTop, onSpanSelected, onRunTranslateBox, fitMode }: Props) {
+                         onTogglePopover, onClosePopover, onRunResize, onMerge, onScissor, onStitch, onRunDensity, onAcceptRewrite, onRejectRewrite, onToggleRewriteTop, onSpanSelected, onRunTranslateBox, activeSpan, onShakeDetected, onAcceptSpanDiff, onRejectSpanDiff, fitMode }: Props) {
   const [snapCandidate, setSnapCandidate] = useState<SnapCandidate | null>(null);
   const fitFns = useRef<Map<string, () => void>>(new Map());
   const getScale = () => panzoomRef.current?.getScale() ?? 1;
@@ -59,6 +63,10 @@ export function Canvas({ boxes, selectedId, popover, panzoomRef, onSelect, onUpd
             onSnap={(dragged, candidate) => onMerge({ ...dragged }, candidate)}
             registerFit={fn => fitFns.current.set(b.id, fn)}
             onSpanSelected={(s, e, sx, sy) => onSpanSelected(b.id, s, e, sx, sy)}
+            activeSpan={activeSpan?.boxId === b.id ? { start: activeSpan.start, end: activeSpan.end, shakeActive: activeSpan.shakeActive } : undefined}
+            onShakeDetected={() => onShakeDetected(b.id)}
+            onAcceptSpanDiff={() => onAcceptSpanDiff(b.id)}
+            onRejectSpanDiff={() => onRejectSpanDiff(b.id)}
           />
         );
       })}

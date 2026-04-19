@@ -6,7 +6,7 @@ import { Toolbar } from './components/Toolbar';
 import { Toast } from './components/Toast';
 import { SpanToolbar, ShakePopover } from './components/SpanToolbar';
 import type { Box, MergedSlot, SnapCandidate, PopoverKind, DensitySpan, AnchorCorner } from './types';
-import { loadFitMode, loadDensityTmpl, loadDensityConcept, loadDensityVisual, loadConfirmRewrite, loadStreamMode } from './storage';
+import { loadFitMode, loadDensityTmpl, loadDensityConcept, loadDensityVisual, loadConfirmRewrite, loadStreamMode, loadSpanDiffMode } from './storage';
 import { callLLM, streamLLM } from './llm';
 import { loadTmpl, loadUserKeys } from './storage';
 import { validateTmpl, renderTmpl, includedVersionsBlock } from './template';
@@ -388,6 +388,17 @@ paragraph_2: ${textB}`;
   // =============================================================================
   // rewrite pipeline
   // =============================================================================
+  // TODO(abort-resize): add AbortController per box to cancel in-flight LLM calls when a new
+  // resize fires before the previous one completes. Pattern:
+  //   const abortRefs = useRef<Map<string, AbortController>>(new Map())
+  //   On new resize: abortRefs.current.get(boxId)?.abort(); const ctrl = new AbortController(); abortRefs.current.set(boxId, ctrl);
+  //   Pass ctrl.signal to callLLM (add signal param to callLLM/streamLLM → pass to pi-ai complete() options).
+  //   On completion/error: abortRefs.current.delete(boxId).
+
+  // TODO(debounce-resize): debounce corner drag → LLM trigger by 300ms so rapid small drags
+  // don't each fire a request. Use a per-box timeout ref, clear on each new pointerup,
+  // only fire runResize after 300ms of no new drags. Same abort pattern as above.
+
   const runResize = useCallback(async (boxId: string, newArea: number, resizeInfo?: { nx: number; ny: number; nw: number; nh: number; origX: number; origY: number; origW: number; origH: number; anchor: AnchorCorner }) => {
     const box = boxes.find(b => b.id === boxId);
     if (!box) return;
@@ -628,12 +639,17 @@ paragraph_2: ${textB}`;
         `Rewrite the following span as ${register}. Preserve meaning. Match the surrounding style. Reply with the rewritten span only.\n\nFull context: ${v.text}\n\nSpan to rewrite: ${spanText}`
       );
       if (!translated.trim()) throw new Error('empty response');
-      const newText = v.text.slice(0, start) + translated + v.text.slice(end);
+      const mode = loadSpanDiffMode();
+      // splice both original + new text into the textarea: ...before...[original][new]...after...
+      // original stays at [start..end], new text inserted at end
+      const combined = v.text.slice(0, end) + translated + v.text.slice(end);
       const newId = `v${box!.versions.length}`;
       updateBox(boxId, b => ({
         ...b,
-        versions: [...b.versions, { id: newId, text: newText, parentId: v.id, targetPct: newText.length / v.text.length, included: true, annotation: b.annotation }],
-        currentVid: newId, _status: '',
+        versions: [...b.versions, { id: newId, text: combined, parentId: v.id, targetPct: combined.length / v.text.length, included: true, annotation: b.annotation }],
+        currentVid: newId,
+        pendingSpanDiff: mode !== 'ghost' ? { strikeStart: start, strikeEnd: end, insertEnd: end + translated.length, mode } : undefined,
+        _status: '',
       } as any));
     } catch (err: any) {
       toast(`translate span failed: ${err.message || err}`);
@@ -641,14 +657,21 @@ paragraph_2: ${textB}`;
     }
   }, [boxes, toast, updateBox]);
 
-  const runShakeSpan = useCallback(async (boxId: string, start: number, end: number) => {
+  const runShakeSpan = useCallback((boxId: string, start: number, end: number) => {
+    // activate shake mode on the span overlay — LLM fires when gesture detected
+    setActiveSpan(prev => prev ? { ...prev, shakeActive: true } : { boxId, start, end, screenX: 0, screenY: 0, shakeActive: true });
+  }, []);
+
+  const onShakeDetected = useCallback(async (boxId: string) => {
+    const span = activeSpan;
+    if (!span || span.boxId !== boxId) return;
     const box = boxes.find(b => b.id === boxId);
     const v = box?.versions.find(v => v.id === box.currentVid);
     if (!v?.text) return;
-    const spanText = v.text.slice(start, end);
+    const spanText = v.text.slice(span.start, span.end);
     if (!spanText.trim()) return;
-    setActiveSpan(null);
-    updateBox(boxId, b => ({ ...b, _status: 'shaking…' } as any));
+    setActiveSpan(prev => prev ? { ...prev, shakeActive: false } : null);
+    updateBox(boxId, b => ({ ...b, _status: 'finding alternatives…' } as any));
     try {
       const result = await callLLM(
         `Give 4 alternative phrasings for the following span. Match the style, tone, and register of the original exactly.\nFull context: ${v.text}\nSpan: ${spanText}\nReply as a JSON array of strings only. No explanation.`
@@ -656,12 +679,38 @@ paragraph_2: ${textB}`;
       const json = result.replace(/^```[a-z]*\n?/m, '').replace(/```$/m, '').trim();
       const alternatives: string[] = JSON.parse(json);
       if (!Array.isArray(alternatives)) throw new Error('expected JSON array');
-      updateBox(boxId, b => ({ ...b, _shakeResult: { start, end, originalText: spanText, alternatives }, _status: '' } as any));
+      updateBox(boxId, b => ({ ...b, _shakeResult: { start: span.start, end: span.end, originalText: spanText, alternatives }, _status: '' } as any));
     } catch (err: any) {
       toast(`shake failed: ${err.message || err}`);
       updateBox(boxId, b => ({ ...b, _status: '' } as any));
     }
-  }, [boxes, toast, updateBox]);
+  }, [activeSpan, boxes, toast, updateBox]);
+
+  const acceptSpanDiff = useCallback((boxId: string) => {
+    // remove the original span [strikeStart..strikeEnd], keep the new text [strikeEnd..insertEnd]
+    setBoxes(bs => bs.map(b => {
+      if (b.id !== boxId || !b.pendingSpanDiff) return b;
+      const { strikeStart, strikeEnd, insertEnd } = b.pendingSpanDiff;
+      const v = b.versions.find(v => v.id === b.currentVid);
+      if (!v) return b;
+      const accepted = v.text.slice(0, strikeStart) + v.text.slice(strikeEnd, insertEnd) + v.text.slice(insertEnd);
+      const newId = `v${b.versions.length}`;
+      return { ...b, versions: [...b.versions, { id: newId, text: accepted, parentId: v.id, targetPct: accepted.length / v.text.length, included: true, annotation: b.annotation }], currentVid: newId, pendingSpanDiff: undefined } as any;
+    }));
+  }, []);
+
+  const rejectSpanDiff = useCallback((boxId: string) => {
+    // remove the new text [strikeEnd..insertEnd], keep the original [strikeStart..strikeEnd]
+    setBoxes(bs => bs.map(b => {
+      if (b.id !== boxId || !b.pendingSpanDiff) return b;
+      const { strikeEnd, insertEnd } = b.pendingSpanDiff;
+      const v = b.versions.find(v => v.id === b.currentVid);
+      if (!v) return b;
+      const rejected = v.text.slice(0, strikeEnd) + v.text.slice(insertEnd);
+      const newId = `v${b.versions.length}`;
+      return { ...b, versions: [...b.versions, { id: newId, text: rejected, parentId: v.id, targetPct: rejected.length / v.text.length, included: true, annotation: b.annotation }], currentVid: newId, pendingSpanDiff: undefined } as any;
+    }));
+  }, []);
 
   const acceptShake = useCallback((boxId: string, alternative: string) => {
     setBoxes(bs => bs.map(b => {
@@ -792,6 +841,39 @@ paragraph_2: ${textB}`;
   // Cancellation: add AbortController per box, cancel on new annotation request.
   // Debounce: 300ms debounce on resize trigger to avoid rapid-fire calls.
 
+  // TODO(export-save): serialize canvas state to JSON and restore it.
+  // State to persist: boxes[] (x,y,w,h,versions,currentVid,calibChars,calibArea,annotation,fontSize,merged,density).
+  // UI: "export" button in Toolbar → downloads JSON. "import" button → file picker, restores state.
+  // Also consider localStorage autosave (throttled, e.g. every 30s) so refresh doesn't lose work.
+  // On import, reassign box IDs to avoid collisions with nextBoxId counter.
+
+  // TODO(multi-box-selection): shift-click a box to add it to a selection set.
+  // State: selectedIds: Set<string> (replace selectedId: string | null).
+  // Visual: all selected boxes get the blue selection ring (SelectionOverlay rendered for each).
+  // Used as context for annotation: when user opens annotation input, all selectedIds' texts
+  // are sent as context_boxes. Also used for batch translate/density/tree-fold.
+  // Lasso selection: drag on empty canvas (without space) draws a rect, selects all boxes it intersects.
+
+  // TODO(review-batch): canned "review" prompts that run annotation across selected boxes.
+  // Presets (shown as buttons in a toolbar or pill popover):
+  //   - "logical fallacies" — find logical fallacies, annotate each as a comment op
+  //   - "clarity" — flag unclear sentences, suggest rewrites as diff ops
+  //   - "flow" — check paragraph transitions, suggest seam edits
+  //   - "citations needed" — flag unsupported claims (pairs with web search TODO)
+  // Each preset fires runAnnotation(selectedBoxIds, null, presetPrompt).
+  // Results are Op[] (comment + optional edit), rendered via SpanOverlay + comment bubbles.
+
+  // TODO(tension-map): background pass that scores each box on multiple axes continuously.
+  // Axes: clarity (0–1), specificity (0–1), energy (0–1).
+  // Runs automatically after text settles (debounced 2s after last edit).
+  // Results tint the box header or border with a subtle color (not the full density overlay).
+  // E.g. low clarity = slight orange border, low energy = slight blue wash.
+  // Prompt: "Score the following text on three axes from 0.0 to 1.0:
+  //   clarity (how easy it is to understand), specificity (how concrete/specific),
+  //   energy (how engaging/active the prose is).
+  //   Reply as JSON: {\"clarity\": 0.0, \"specificity\": 0.0, \"energy\": 0.0}"
+  // Runs in the background without blocking the UI (fire-and-forget, no status indicator).
+
   const togglePopover = useCallback((boxId: string, kind: PopoverKind) => {
     setPopover(p => (p?.boxId === boxId && p?.kind === kind) ? null : { boxId, kind });
   }, []);
@@ -841,6 +923,10 @@ paragraph_2: ${textB}`;
             onToggleRewriteTop={toggleRewriteTop}
             onSpanSelected={(boxId, s, e, sx, sy) => setActiveSpan({ boxId, start: s, end: e, screenX: sx, screenY: sy })}
             onRunTranslateBox={runTranslateBox}
+            activeSpan={activeSpan}
+            onShakeDetected={onShakeDetected}
+            onAcceptSpanDiff={acceptSpanDiff}
+            onRejectSpanDiff={rejectSpanDiff}
             fitMode={loadFitMode()}
             toast={toast}
           />

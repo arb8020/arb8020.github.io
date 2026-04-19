@@ -255,6 +255,20 @@ export function Sidebar({ open, onClose, toast }: Props) {
         ))}
       </div>
 
+      {/* TODO(sidebar-settings): add the following toggles below overflow strategy:
+          1. Confirm rewrite (default on): loadConfirmRewrite/saveConfirmRewrite
+             Toggle label: "show ghost diff before committing rewrite"
+          2. Stream mode (default on): loadStreamMode/saveStreamMode
+             Toggle label: "stream LLM output word-by-word" (only applies when confirm=off)
+          3. Span diff mode: loadSpanDiffMode/saveSpanDiffMode
+             Segmented control: google-docs | code-diff | ghost
+             Label: "span edit rendering"
+          4. Density section: loadDensityConcept/saveDensityConcept (text input, default 'importance')
+             loadDensityVisual/saveDensityVisual (heatmap | opacity segmented control)
+             loadDensityTmpl/saveDensityTmpl (textarea with {{concept}} and {{text}} placeholders)
+             "clear density" button: calls onClearDensity(boxId) → updateBox density: undefined
+          All use the same segmented button pattern as overflow strategy. */}
+
       {/* template */}
       <h4 style={h4}>Prompt template</h4>
       <p style={{ color: 'var(--muted)', fontSize: 12, lineHeight: 1.5, margin: '0 0 6px' }}>
