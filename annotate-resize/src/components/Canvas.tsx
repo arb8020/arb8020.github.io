@@ -5,6 +5,7 @@ import type { Box, PopoverKind, FitMode, SnapCandidate } from '../types';
 import { BoxComponent } from './BoxComponent';
 import { SelectionOverlay } from './SelectionOverlay';
 import { GhostBox } from './GhostBox';
+import { computeResize, anchorForCorner, assertAnchorShared } from '../geometry';
 
 interface Props {
   boxes: Box[];
@@ -143,43 +144,33 @@ function startResize(
 ) {
   e.preventDefault();
   e.stopPropagation();
+  const startRect = { x: box.x, y: box.y, w: box.w, h: box.h };
   const startArea = box.w * box.h;
-  const start = { x: e.clientX, y: e.clientY, bx: box.x, by: box.y, bw: box.w, bh: box.h };
-  const minW = 120, minH = 80;
-
-  // anchor = opposite corner to dragged corner
-  const anchorMap: Record<string, import('../types').AnchorCorner> = {
-    br: 'tl', tl: 'br', tr: 'bl', bl: 'tr',
-  };
+  const startPointer = { x: e.clientX, y: e.clientY };
 
   const move = (ev: PointerEvent) => {
-    const { dx, dy } = worldDelta(ev.clientX - start.x, ev.clientY - start.y);
-    let nx = start.bx, ny = start.by, nw = start.bw, nh = start.bh;
-    if (dir.includes('l')) { nx = start.bx + dx; nw = start.bw - dx; }
-    if (dir.includes('r')) { nw = start.bw + dx; }
-    if (dir.includes('t')) { ny = start.by + dy; nh = start.bh - dy; }
-    if (dir.includes('b')) { nh = start.bh + dy; }
-    if (nw < minW) { if (dir.includes('l')) nx -= (minW - nw); nw = minW; }
-    if (nh < minH) { if (dir.includes('t')) ny -= (minH - nh); nh = minH; }
-    onUpdateBox(box.id, b => ({ ...b, x: nx, y: ny, w: nw, h: nh }));
+    const { dx, dy } = worldDelta(ev.clientX - startPointer.x, ev.clientY - startPointer.y);
+    const next = computeResize(dir, startRect, dx, dy);
+    onUpdateBox(box.id, b => ({ ...b, x: next.x, y: next.y, w: next.w, h: next.h }));
   };
 
   const up = (ev: PointerEvent) => {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
-    const dx = worldDelta(ev.clientX - start.x, 0).dx;
-    const dy = worldDelta(0, ev.clientY - start.y).dy;
-    let nx = start.bx, ny = start.by, nw = start.bw, nh = start.bh;
-    if (dir.includes('l')) { nx = start.bx + dx; nw = start.bw - dx; }
-    if (dir.includes('r')) { nw = start.bw + dx; }
-    if (dir.includes('t')) { ny = start.by + dy; nh = start.bh - dy; }
-    if (dir.includes('b')) { nh = start.bh + dy; }
-    nw = Math.max(minW, nw); nh = Math.max(minH, nh);
-    const endArea = nw * nh;
+    const { dx } = worldDelta(ev.clientX - startPointer.x, 0);
+    const { dy } = worldDelta(0, ev.clientY - startPointer.y);
+    const next = computeResize(dir, startRect, dx, dy);
+    const endArea = next.w * next.h;
     const isCorner = dir.length === 2;
     if (isCorner && Math.abs(endArea - startArea) / startArea >= 0.05) {
-      const anchor = anchorMap[dir] ?? 'tl';
-      onRunResize(box.id, endArea, { nx, ny, nw, nh, origX: start.bx, origY: start.by, origW: start.bw, origH: start.bh, anchor });
+      const anchor = anchorForCorner(dir);
+      // pendingRewrite contract: the anchor corner of (orig) and (target) must be shared
+      assertAnchorShared(anchor, startRect, next);
+      onRunResize(box.id, endArea, {
+        nx: next.x, ny: next.y, nw: next.w, nh: next.h,
+        origX: startRect.x, origY: startRect.y, origW: startRect.w, origH: startRect.h,
+        anchor,
+      });
     } else if (!isCorner) {
       // edge resize: no LLM call, but trigger fit to prevent overflow
       onEdgeResizeDone(box.id);

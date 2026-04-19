@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PendingRewrite } from '../types';
+import { anchoredPos as computeAnchoredPos, assertAnchorShared } from '../geometry';
 
 interface Props {
   pending: PendingRewrite;
@@ -24,17 +25,14 @@ export function GhostBox({ pending, onAccept, onReject, onToggle, fontSize }: Pr
   const [animating, setAnimating] = useState(true);
   const [dims, setDims] = useState({ x: pending.origX, y: pending.origY, w: pending.origW, h: pending.origH }); // starts at orig dims, anchored position computed on mount
 
-  // compute ghost position so anchor corner is shared with original box
-  // the ghost may be smaller or larger than the original
-  function anchoredPos(w: number, h: number) {
-    const { origX: ox, origY: oy, origW: ow, origH: oh, anchor } = pending;
-    switch (anchor) {
-      case 'tl': return { x: ox, y: oy };                         // tl fixed
-      case 'tr': return { x: ox + ow - w, y: oy };                // tr fixed
-      case 'bl': return { x: ox, y: oy + oh - h };                // bl fixed
-      case 'br': return { x: ox + ow - w, y: oy + oh - h };       // br fixed
-    }
-  }
+  // compute ghost position so anchor corner is shared with original box.
+  // curries the orig rect + anchor from `pending`; asserts anchor is shared.
+  const anchoredPos = (w: number, h: number) => {
+    const orig = { x: pending.origX, y: pending.origY, w: pending.origW, h: pending.origH };
+    const pos = computeAnchoredPos(pending.anchor, orig, w, h);
+    assertAnchorShared(pending.anchor, orig, { x: pos.x, y: pos.y, w, h });
+    return pos;
+  };
 
   // animate from orig → target on mount
   useEffect(() => {
@@ -77,9 +75,17 @@ export function GhostBox({ pending, onAccept, onReject, onToggle, fontSize }: Pr
         const needed = ta.scrollHeight;
         ta.style.height = '';
         ta.style.width = '';
-        setDims(d => ({ ...d, w: maxW, h: Math.max(80, needed + 22 + 2) }));
+        const fittedH = Math.max(80, needed + 22 + 2);
+        // width/height changed — recompute anchored position so the anchor
+        // corner stays glued to the original box's anchor corner.
+        const pos = anchoredPos(maxW, fittedH);
+        setDims({ x: pos.x, y: pos.y, w: maxW, h: fittedH });
       } else if (newW !== pending.targetW) {
-        setDims(d => ({ ...d, w: newW }));
+        // width changed — recompute anchored x; height unchanged.
+        setDims(d => {
+          const pos = anchoredPos(newW, d.h);
+          return { ...d, x: pos.x, w: newW };
+        });
       }
       ta.scrollTop = 0;
     }, 230);
