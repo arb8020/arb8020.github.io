@@ -166,11 +166,46 @@ export function Sidebar({ open, onClose, toast }: Props) {
 
       {/* api key */}
       <h4 style={h4}>API key</h4>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6 }}>
-        <input type="password" style={s} value={apiKey} placeholder={`paste ${UNIQUE_PROVIDERS.find(p => p.id === provider)?.label} key`}
-          onChange={e => onApiKeyChange(e.target.value)} />
-        <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, color: 'var(--muted)', alignSelf: 'center' }}>{tail4(apiKey)}</span>
-      </div>
+      {(() => {
+        const envVar = UNIQUE_PROVIDERS.find(p => p.id === provider)?.envVar ?? 'API_KEY';
+        // if the user pastes "FOO_API_KEY=value" or "export FOO_API_KEY=value", strip the prefix
+        const stripEnvPrefix = (v: string) => {
+          let s = v.trim();
+          s = s.replace(/^export\s+/i, '');
+          const eq = s.indexOf('=');
+          if (eq > 0 && /^[A-Z0-9_]+$/.test(s.slice(0, eq))) s = s.slice(eq + 1);
+          return s.replace(/^['"]|['"]$/g, '');
+        };
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'stretch',
+            border: '1px solid var(--border)', borderRadius: 6,
+            background: 'var(--panel-2)', overflow: 'hidden',
+          }}>
+            <span style={{
+              fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12,
+              color: 'var(--muted)', padding: '6px 2px 6px 8px',
+              userSelect: 'none',
+            }}>{envVar}=</span>
+            <input
+              type="password"
+              style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', padding: '6px 8px 6px 0', font: 'inherit', color: 'var(--text)' }}
+              value={apiKey}
+              placeholder="paste key"
+              onChange={e => onApiKeyChange(stripEnvPrefix(e.target.value))}
+              onPaste={e => {
+                const text = e.clipboardData.getData('text');
+                const cleaned = stripEnvPrefix(text);
+                if (cleaned !== text) {
+                  e.preventDefault();
+                  onApiKeyChange(cleaned);
+                }
+              }}
+            />
+            <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, color: 'var(--muted)', alignSelf: 'center', padding: '0 8px' }}>{tail4(apiKey)}</span>
+          </div>
+        );
+      })()}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
         <button style={ghost} onClick={onValidate} disabled={validating}>validate key</button>
         <span style={{ fontSize: 12, color: validateStatus.startsWith('✓') ? 'var(--ok)' : 'var(--warn)' }}>{validateStatus}</span>

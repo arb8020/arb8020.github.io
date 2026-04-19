@@ -1,13 +1,14 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Panzoom, { type PanzoomObject } from '@panzoom/panzoom';
 import { Canvas } from './components/Canvas';
 import { Sidebar } from './components/Sidebar';
 import { Toolbar } from './components/Toolbar';
 import { Toast } from './components/Toast';
 import { SpanToolbar, ShakePopover } from './components/SpanToolbar';
-import type { Box, MergedSlot, SnapCandidate, PopoverKind, DensitySpan, AnchorCorner } from './types';
-import { loadFitMode, loadDensityTmpl, loadDensityConcept, loadDensityVisual, loadConfirmRewrite, loadStreamMode, loadSpanDiffMode, saveCanvas, loadCanvas } from './storage';
-import { callLLM, streamLLM } from './llm';
+import type { Box, MergedSlot, SnapCandidate, PopoverKind, AnchorCorner } from './types';
+import { loadFitMode, loadConfirmRewrite, loadStreamMode, loadSpanDiffMode, saveCanvas, loadCanvas } from './storage';
+import { callLLM, streamLLM, AbortedError } from './llm';
 import { loadTmpl, loadUserKeys } from './storage';
 import { validateTmpl, renderTmpl, includedVersionsBlock } from './template';
 
@@ -64,8 +65,30 @@ export default function App() {
   const [activeSpan, setActiveSpan] = useState<{ boxId: string; start: number; end: number; screenX: number; screenY: number } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
+  // translate popover anchored to a box header after a shake gesture
+  const [translateShake, setTranslateShake] = useState<{ boxId: string; x: number; y: number } | null>(null);
   const [toasts, setToasts] = useState<{ id: number; msg: string; kind: string }[]>([]);
   const toastId = useRef(0);
+  // one in-flight LLM call per box — starting a new call aborts the previous one.
+  // the key is the boxId the call targets.
+  const abortersRef = useRef<Map<string, AbortController>>(new Map());
+
+  const startLLM = useCallback((boxId: string): AbortSignal => {
+    abortersRef.current.get(boxId)?.abort();
+    const ctrl = new AbortController();
+    abortersRef.current.set(boxId, ctrl);
+    return ctrl.signal;
+  }, []);
+
+  const endLLM = useCallback((boxId: string, signal: AbortSignal) => {
+    const current = abortersRef.current.get(boxId);
+    if (current && current.signal === signal) abortersRef.current.delete(boxId);
+  }, []);
+
+  const abortBox = useCallback((boxId: string) => {
+    const ctrl = abortersRef.current.get(boxId);
+    if (ctrl) { ctrl.abort(); abortersRef.current.delete(boxId); }
+  }, []);
 
   // debounced autosave — 1s after last mutation
   useEffect(() => {
@@ -111,10 +134,24 @@ export default function App() {
         vp.style.cursor = 'grab';
         e.preventDefault();
       }
-      if (e.code === 'Escape') { setSelectedId(null); setPopover(null); }
+      if (e.code === 'Escape') {
+        // if an LLM call is in flight on the selected box, abort it instead of deselecting
+        const id = selectedIdRef.current;
+        if (id && abortersRef.current.has(id)) {
+          abortersRef.current.get(id)!.abort();
+          abortersRef.current.delete(id);
+        } else {
+          setSelectedId(null); setPopover(null);
+        }
+      }
       if (e.code === 'Backspace' && t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA') {
         const id = selectedIdRef.current;
-        if (id) { setBoxes(bs => bs.filter(b => b.id !== id)); setSelectedId(null); setPopover(null); }
+        if (id) {
+          abortersRef.current.get(id)?.abort();
+          abortersRef.current.delete(id);
+          setBoxes(bs => bs.filter(b => b.id !== id));
+          setSelectedId(null); setPopover(null);
+        }
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -231,6 +268,7 @@ export default function App() {
     // LLM call: suggest transitions at the boundary — skip if either box has no text
     if (!textA || !textB) return;
     updateBox(mergedId, b => ({ ...b, _status: 'joining…' } as any));
+    const signal = startLLM(mergedId);
     try {
       const prompt = `Two paragraphs have been placed adjacent to each other. Minimally edit them so they flow together naturally at the boundary.
 
@@ -247,7 +285,7 @@ Reply in exactly this format:
 p1: <full text of paragraph 1, minimally edited>
 p2: <full text of paragraph 2, minimally edited>`;
 
-      const result = await callLLM(prompt);
+      const result = await callLLM(prompt, undefined, signal);
 
       const newTextA = result.match(/^p1:\s*([\s\S]+?)(?=\np2:)/m)?.[1]?.trim() ?? '';
       const newTextB = result.match(/^p2:\s*([\s\S]+?)$/m)?.[1]?.trim() ?? '';
@@ -280,10 +318,13 @@ p2: <full text of paragraph 2, minimally edited>`;
         updateBox(mergedId, b => ({ ...b, _status: '' } as any));
       }
     } catch (err: any) {
+      if (err instanceof AbortedError) { updateBox(mergedId, b => ({ ...b, _status: '' } as any)); return; }
       toast(`join failed: ${err.message || err}`);
       updateBox(mergedId, b => ({ ...b, _status: '' } as any));
+    } finally {
+      endLLM(mergedId, signal);
     }
-  }, [boxes, toast, updateBox]);
+  }, [boxes, toast, updateBox, startLLM, endLLM]);
 
   const scissorBox = useCallback(async (boxId: string) => {
     const box = boxes.find(b => b.id === boxId);
@@ -320,6 +361,7 @@ p2: <full text of paragraph 2, minimally edited>`;
 
     // LLM split
     updateBox(boxId, b => ({ ...b, _status: 'splitting…' } as any));
+    const signal = startLLM(boxId);
     try {
       const prompt = `This text was merged from two paragraphs. Split it back at the natural boundary.
 Minimally rewrite each half so it reads as a standalone paragraph.
@@ -330,7 +372,7 @@ merged_text: ${textA}\n\n${textB}
 original_paragraph_1: ${slotA.textAtMerge}
 original_paragraph_2: ${slotB.textAtMerge}`;
 
-      const result = await callLLM(prompt);
+      const result = await callLLM(prompt, undefined, signal);
       const parts = result.split('<<<SPLIT>>>');
       if (parts.length < 2) throw new Error('LLM did not return <<<SPLIT>>> delimiter');
       const newTextA = parts[0].trim();
@@ -360,10 +402,13 @@ original_paragraph_2: ${slotB.textAtMerge}`;
         return [...rest, makeRestored(slotA, newTextA, true), makeRestored(slotB, newTextB, false)];
       });
     } catch (err: any) {
+      if (err instanceof AbortedError) { updateBox(boxId, b => ({ ...b, _status: '' } as any)); return; }
       toast(`split failed: ${err.message || err}`);
       updateBox(boxId, b => ({ ...b, _status: '' } as any));
+    } finally {
+      endLLM(boxId, signal);
     }
-  }, [boxes, toast, updateBox]);
+  }, [boxes, toast, updateBox, startLLM, endLLM]);
 
   const stitchBox = useCallback(async (boxId: string) => {
     const box = boxes.find(b => b.id === boxId);
@@ -373,13 +418,14 @@ original_paragraph_2: ${slotB.textAtMerge}`;
     const textB = slotCurrentText(box.merged.slotB);
 
     updateBox(boxId, b => ({ ...b, _status: 'stitching…' } as any));
+    const signal = startLLM(boxId);
     try {
       const prompt = `Combine these two paragraphs into a single continuous paragraph with no separation. Make the content flow as naturally as possible. Reply with the combined text only — no newlines between what were the two paragraphs.
 
 paragraph_1: ${textA}
 paragraph_2: ${textB}`;
 
-      const result_final = await callLLM(prompt);
+      const result_final = await callLLM(prompt, undefined, signal);
       if (!result_final.trim()) throw new Error('LLM returned empty response');
 
       updateBox(boxId, b => {
@@ -395,24 +441,20 @@ paragraph_2: ${textB}`;
         } as any;
       });
     } catch (err: any) {
+      if (err instanceof AbortedError) { updateBox(boxId, b => ({ ...b, _status: '' } as any)); return; }
       toast(`stitch failed: ${err.message || err}`);
       updateBox(boxId, b => ({ ...b, _status: '' } as any));
+    } finally {
+      endLLM(boxId, signal);
     }
-  }, [boxes, toast, updateBox]);
+  }, [boxes, toast, updateBox, startLLM, endLLM]);
 
   // =============================================================================
   // rewrite pipeline
   // =============================================================================
-  // TODO(abort-resize): add AbortController per box to cancel in-flight LLM calls when a new
-  // resize fires before the previous one completes. Pattern:
-  //   const abortRefs = useRef<Map<string, AbortController>>(new Map())
-  //   On new resize: abortRefs.current.get(boxId)?.abort(); const ctrl = new AbortController(); abortRefs.current.set(boxId, ctrl);
-  //   Pass ctrl.signal to callLLM (add signal param to callLLM/streamLLM → pass to pi-ai complete() options).
-  //   On completion/error: abortRefs.current.delete(boxId).
-
-  // TODO(debounce-resize): debounce corner drag → LLM trigger by 300ms so rapid small drags
-  // don't each fire a request. Use a per-box timeout ref, clear on each new pointerup,
-  // only fire runResize after 300ms of no new drags. Same abort pattern as above.
+  // Abort model: starting a new LLM call on a box aborts the previous one via abortersRef.
+  // Debounce wasn't added — resize only fires once on pointerup, so aborts are sufficient to
+  // handle "user dragged again mid-flight".
 
   const runResize = useCallback(async (boxId: string, newArea: number, resizeInfo?: { nx: number; ny: number; nw: number; nh: number; origX: number; origY: number; origW: number; origH: number; anchor: AnchorCorner }) => {
     const box = boxes.find(b => b.id === boxId);
@@ -442,6 +484,7 @@ paragraph_2: ${textB}`;
       const targetB = Math.max(20, totalTarget - targetA);
 
       updateBox(boxId, b => ({ ...b, _status: 'rewriting…' } as any));
+      const mergedSignal = startLLM(boxId);
 
       const rewriteSlot = async (text: string, target: number, annotation: string) => {
         const tmpl = loadTmpl();
@@ -453,7 +496,7 @@ paragraph_2: ${textB}`;
           annotation: annotation || '(none)', included_versions: '(none)',
           ...userKeys,
         };
-        return callLLM(renderTmpl(tmpl, vars));
+        return callLLM(renderTmpl(tmpl, vars), undefined, mergedSignal);
       };
 
       try {
@@ -470,8 +513,11 @@ paragraph_2: ${textB}`;
           return { ...b, merged: { ...b.merged!, slotA: makeNewSlot(b.merged!.slotA, newA), slotB: makeNewSlot(b.merged!.slotB, newB) }, calibArea: newArea, _status: '' } as any;
         });
       } catch (err: any) {
+        if (err instanceof AbortedError) { updateBox(boxId, b => ({ ...b, _status: '' } as any)); return; }
         toast(`rewrite failed: ${err.message || err}`);
         updateBox(boxId, b => ({ ...b, _status: '' } as any));
+      } finally {
+        endLLM(boxId, mergedSignal);
       }
       return;
     }
@@ -504,6 +550,7 @@ paragraph_2: ${textB}`;
 
     const pct = Math.round((targetChars / Math.max(1, box.calibChars)) * 100);
     updateBox(boxId, b => ({ ...b, _status: `rewriting: ${targetChars}c | ${pct}%` } as any));
+    const signal = startLLM(boxId);
 
     const commitText = (text: string) => {
       if (!text.trim()) { toast('rewrite failed: empty response'); updateBox(boxId, b => ({ ...b, _status: '' } as any)); return; }
@@ -550,18 +597,22 @@ paragraph_2: ${textB}`;
             (fullText) => { if (ta) { ta.disabled = false; ta.scrollTop = 0; } commitText(fullText); resolve(); },
             (msg) => { if (ta) ta.disabled = false; reject(new Error(msg)); },
             smartMaxTokens,
+            signal,
           );
         });
         return;
       }
 
-      const text = await callLLM(initialPrompt, smartMaxTokens);
+      const text = await callLLM(initialPrompt, smartMaxTokens, signal);
       commitText(text);
     } catch (err: any) {
+      if (err instanceof AbortedError || signal.aborted) { updateBox(boxId, b => ({ ...b, _status: '' } as any)); return; }
       toast(`rewrite failed: ${err.message || err}`);
       updateBox(boxId, b => ({ ...b, _status: '' } as any));
+    } finally {
+      endLLM(boxId, signal);
     }
-  }, [boxes, toast, updateBox]);
+  }, [boxes, toast, updateBox, startLLM, endLLM]);
 
   const acceptRewrite = useCallback((boxId: string) => {
     setBoxes(bs => bs.map(b => {
@@ -582,8 +633,9 @@ paragraph_2: ${textB}`;
 
   const rejectRewrite = useCallback((boxId: string) => {
     // restore original dims (box was snapped back already, nothing to do for position)
+    abortBox(boxId);
     updateBox(boxId, b => ({ ...b, pendingRewrite: undefined }));
-  }, [updateBox]);
+  }, [updateBox, abortBox]);
 
   const toggleRewriteTop = useCallback((boxId: string) => {
     updateBox(boxId, b => {
@@ -592,41 +644,20 @@ paragraph_2: ${textB}`;
     });
   }, [updateBox]);
 
-  const runDensity = useCallback(async (boxId: string) => {
-    const box = boxes.find(b => b.id === boxId);
-    if (!box || box.versions.length === 0) return;
-    const v = box.versions.find(x => x.id === box.currentVid);
-    if (!v?.text) return;
-
-    const concept = loadDensityConcept();
-    const visual = loadDensityVisual();
-    const tmpl = loadDensityTmpl();
-    const prompt = tmpl
-      .replace('{{concept}}', concept)
-      .replace('{{text}}', v.text);
-
-    updateBox(boxId, b => ({ ...b, _status: 'scoring…' } as any));
-    try {
-      const result = await callLLM(prompt);
-      // strip possible markdown fences
-      const json = result.replace(/^```[a-z]*\n?/m, '').replace(/```$/m, '').trim();
-      const spans: DensitySpan[] = JSON.parse(json);
-      if (!Array.isArray(spans)) throw new Error('expected JSON array');
-      updateBox(boxId, b => ({ ...b, density: { spans, visual }, _status: '' } as any));
-    } catch (err: any) {
-      toast(`density scoring failed: ${err.message || err}`);
-      updateBox(boxId, b => ({ ...b, _status: '' } as any));
-    }
-  }, [boxes, toast, updateBox]);
+  // density scoring removed — pending redesign (sentence-partition with per-sentence score).
+  // scaffolding kept: DensityOverlay.tsx, density* storage helpers, Density* types, box.density field.
 
   const runTranslateBox = useCallback(async (boxId: string, register: string) => {
     const box = boxes.find(b => b.id === boxId);
     const v = box?.versions.find(v => v.id === box.currentVid);
     if (!v?.text) return;
     updateBox(boxId, b => ({ ...b, _status: `translating: ${register}` } as any));
+    const signal = startLLM(boxId);
     try {
       const text = await callLLM(
-        `Rewrite the following text as ${register}. Preserve all meaning. Reply with the rewritten text only.\n\ntext: ${v.text}`
+        `Rewrite the following text as ${register}. Preserve all meaning. Reply with the rewritten text only.\n\ntext: ${v.text}`,
+        undefined,
+        signal,
       );
       if (!text.trim()) throw new Error('empty response');
       const newId = `v${box!.versions.length}`;
@@ -636,10 +667,13 @@ paragraph_2: ${textB}`;
         currentVid: newId, _status: '',
       } as any));
     } catch (err: any) {
+      if (err instanceof AbortedError) { updateBox(boxId, b => ({ ...b, _status: '' } as any)); return; }
       toast(`translate failed: ${err.message || err}`);
       updateBox(boxId, b => ({ ...b, _status: '' } as any));
+    } finally {
+      endLLM(boxId, signal);
     }
-  }, [boxes, toast, updateBox]);
+  }, [boxes, toast, updateBox, startLLM, endLLM]);
 
   const runTranslateSpan = useCallback(async (boxId: string, start: number, end: number, register: string) => {
     const box = boxes.find(b => b.id === boxId);
@@ -649,9 +683,12 @@ paragraph_2: ${textB}`;
     if (!spanText.trim()) return;
     setActiveSpan(null);
     updateBox(boxId, b => ({ ...b, _status: `translating span: ${register}` } as any));
+    const signal = startLLM(boxId);
     try {
       const translated = await callLLM(
-        `Rewrite the following span as ${register}. Preserve meaning. Match the surrounding style. Reply with the rewritten span only.\n\nFull context: ${v.text}\n\nSpan to rewrite: ${spanText}`
+        `Rewrite the following span as ${register}. Preserve meaning. Match the surrounding style. Reply with the rewritten span only.\n\nFull context: ${v.text}\n\nSpan to rewrite: ${spanText}`,
+        undefined,
+        signal,
       );
       if (!translated.trim()) throw new Error('empty response');
       const mode = loadSpanDiffMode();
@@ -667,10 +704,13 @@ paragraph_2: ${textB}`;
         _status: '',
       } as any));
     } catch (err: any) {
+      if (err instanceof AbortedError) { updateBox(boxId, b => ({ ...b, _status: '' } as any)); return; }
       toast(`translate span failed: ${err.message || err}`);
       updateBox(boxId, b => ({ ...b, _status: '' } as any));
+    } finally {
+      endLLM(boxId, signal);
     }
-  }, [boxes, toast, updateBox]);
+  }, [boxes, toast, updateBox, startLLM, endLLM]);
 
   const runShakeSpan = useCallback((boxId: string, start: number, end: number) => {
     // activate shake mode on the span overlay — LLM fires when gesture detected
@@ -687,19 +727,25 @@ paragraph_2: ${textB}`;
     if (!spanText.trim()) return;
     setActiveSpan(prev => prev ? { ...prev, shakeActive: false } : null);
     updateBox(boxId, b => ({ ...b, _status: 'finding alternatives…' } as any));
+    const signal = startLLM(boxId);
     try {
       const result = await callLLM(
-        `Give 4 alternative phrasings for the following span. Match the style, tone, and register of the original exactly.\nFull context: ${v.text}\nSpan: ${spanText}\nReply as a JSON array of strings only. No explanation.`
+        `Give 4 alternative phrasings for the following span. Match the style, tone, and register of the original exactly.\nFull context: ${v.text}\nSpan: ${spanText}\nReply as a JSON array of strings only. No explanation.`,
+        undefined,
+        signal,
       );
       const json = result.replace(/^```[a-z]*\n?/m, '').replace(/```$/m, '').trim();
       const alternatives: string[] = JSON.parse(json);
       if (!Array.isArray(alternatives)) throw new Error('expected JSON array');
       updateBox(boxId, b => ({ ...b, _shakeResult: { start: span.start, end: span.end, originalText: spanText, alternatives }, _status: '' } as any));
     } catch (err: any) {
+      if (err instanceof AbortedError) { updateBox(boxId, b => ({ ...b, _status: '' } as any)); return; }
       toast(`shake failed: ${err.message || err}`);
       updateBox(boxId, b => ({ ...b, _status: '' } as any));
+    } finally {
+      endLLM(boxId, signal);
     }
-  }, [activeSpan, boxes, toast, updateBox]);
+  }, [activeSpan, boxes, toast, updateBox, startLLM, endLLM]);
 
   const acceptSpanDiff = useCallback((boxId: string) => {
     // remove the original span [strikeStart..strikeEnd], keep the new text [strikeEnd..insertEnd]
@@ -968,16 +1014,15 @@ paragraph_2: ${textB}`;
             onMerge={mergeBoxes}
             onScissor={scissorBox}
             onStitch={stitchBox}
-            onRunDensity={runDensity}
             onAcceptRewrite={acceptRewrite}
             onRejectRewrite={rejectRewrite}
             onToggleRewriteTop={toggleRewriteTop}
             onSpanSelected={(boxId, s, e, sx, sy) => setActiveSpan({ boxId, start: s, end: e, screenX: sx, screenY: sy })}
-            onRunTranslateBox={runTranslateBox}
             activeSpan={activeSpan}
             onShakeDetected={onShakeDetected}
             onAcceptSpanDiff={acceptSpanDiff}
             onRejectSpanDiff={rejectSpanDiff}
+            onHeaderShake={(boxId, anchor) => setTranslateShake({ boxId, x: anchor.x, y: anchor.y })}
             fitMode={loadFitMode()}
             toast={toast}
           />
@@ -1015,6 +1060,19 @@ paragraph_2: ${textB}`;
         );
       })}
 
+      {translateShake && (
+        <HeaderTranslatePopover
+          anchorX={translateShake.x}
+          anchorY={translateShake.y}
+          onTranslate={register => {
+            const id = translateShake.boxId;
+            setTranslateShake(null);
+            runTranslateBox(id, register);
+          }}
+          onDismiss={() => setTranslateShake(null)}
+        />
+      )}
+
       <button
         className="sidebarToggle"
         style={{
@@ -1042,5 +1100,50 @@ paragraph_2: ${textB}`;
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} toast={toast} />
       <Toast toasts={toasts} onDismiss={id => setToasts(t => t.filter(x => x.id !== id))} />
     </div>
+  );
+}
+
+function HeaderTranslatePopover({ anchorX, anchorY, onTranslate, onDismiss }: {
+  anchorX: number; anchorY: number;
+  onTranslate: (register: string) => void;
+  onDismiss: () => void;
+}) {
+  const [value, setValue] = useState('');
+  const PRESETS = ['linkedin', 'pirate speak', 'ELI5', 'formal', 'casual'];
+  return createPortal(
+    <>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 399 }} onPointerDown={onDismiss} />
+      <div style={{
+        position: 'fixed', zIndex: 400,
+        left: anchorX, top: anchorY + 8,
+        transform: 'translateX(-50%)',
+        background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 8,
+        padding: 10, minWidth: 240, boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+      }}
+        onPointerDown={e => e.stopPropagation()}
+      >
+        <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Translate / rewrite as</div>
+        <input
+          autoFocus
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && value.trim()) onTranslate(value.trim());
+            if (e.key === 'Escape') onDismiss();
+          }}
+          placeholder="portuguese, pirate speak, linkedin…"
+          style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 8px', font: '13px/1.45 inherit', background: 'var(--panel-2)', marginBottom: 8 }}
+        />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {PRESETS.map(p => (
+            <button key={p} onClick={() => onTranslate(p)} style={{
+              padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border)',
+              background: 'var(--panel-2)', cursor: 'pointer', fontSize: 12,
+            }}>{p}</button>
+          ))}
+        </div>
+      </div>
+    </>,
+    document.body
   );
 }

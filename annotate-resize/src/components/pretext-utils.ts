@@ -23,6 +23,12 @@ export function buildCharRects(
   let lineY = paddingTop;
   let charOffset = 0;
 
+  // one shared canvas context for exact prefix measurement — avoids
+  // the cumulative drift from averaging frag.occupiedWidth / fragText.length
+  const measureCanvas = document.createElement('canvas');
+  const measureCtx = measureCanvas.getContext('2d')!;
+  measureCtx.font = font;
+
   for (const line of text.split('\n')) {
     if (line.length === 0) {
       lineY += lineHeightPx;
@@ -45,12 +51,21 @@ export function buildCharRects(
         curX += frag.gapBefore;
         const fragStart = charOffset + offsets[frag.itemIndex];
         const fragText = tokens[frag.itemIndex];
-        const charW = frag.occupiedWidth / Math.max(1, fragText.length);
+        // measure exact prefix width per char so variable-width fonts
+        // (inter, system fonts) don't accumulate drift across the word
+        let prevPrefix = 0;
         for (let i = 0; i < fragText.length; i++) {
+          const nextPrefix = measureCtx.measureText(fragText.slice(0, i + 1)).width;
           const idx = fragStart + i;
           if (idx < text.length) {
-            rects[idx] = { x: curX + i * charW, y: lineY, w: charW, h: lineHeightPx };
+            rects[idx] = {
+              x: curX + prevPrefix,
+              y: lineY,
+              w: nextPrefix - prevPrefix,
+              h: lineHeightPx,
+            };
           }
+          prevPrefix = nextPrefix;
         }
         curX += frag.occupiedWidth;
       }

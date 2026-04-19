@@ -2,7 +2,6 @@ import { useRef, useEffect, useCallback } from 'react';
 import type { RefObject } from 'react';
 import type { PanzoomObject } from '@panzoom/panzoom';
 import type { Box, FitMode, SnapCandidate } from '../types';
-import { DensityOverlay } from './DensityOverlay';
 import { SpanOverlay } from './SpanOverlay';
 import { prepareRichInline, walkRichInlineLineRanges } from '@chenglou/pretext/rich-inline';
 
@@ -28,6 +27,8 @@ interface Props {
   onShakeDetected?: () => void;
   onAcceptSpanDiff?: () => void;
   onRejectSpanDiff?: () => void;
+  // header shake → translate popover anchor
+  onHeaderShake?: (anchor: { x: number; y: number }) => void;
 }
 
 // Returns the 4 edge midpoints of a box in world coords
@@ -63,7 +64,7 @@ function computeGhost(dragged: Box, target: Box, dragEdge: 'T' | 'B' | 'L' | 'R'
   }
 }
 
-export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate, fitMode, worldDelta, onSnapCandidate, onSnap, onScissor, onStitch, registerFit, onSpanSelected, activeSpan, onShakeDetected, onAcceptSpanDiff, onRejectSpanDiff }: Props) {
+export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate, fitMode, worldDelta, onSnapCandidate, onSnap, onScissor, onStitch, registerFit, onSpanSelected, activeSpan, onShakeDetected, onAcceptSpanDiff, onRejectSpanDiff, onHeaderShake }: Props) {
   const taRefA = useRef<HTMLTextAreaElement>(null);
   const taRefB = useRef<HTMLTextAreaElement>(null);
 
@@ -182,10 +183,38 @@ export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate,
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
+    onSelect();
     const start = { x: e.clientX, y: e.clientY, bx: box.x, by: box.y };
     let lastCandidate: SnapCandidate | null = null;
+    // shake detection — ≥3 velocity sign changes in 600ms → translate popover
+    const samples: { t: number; x: number }[] = [{ t: Date.now(), x: e.clientX }];
+    let shook = false;
 
     const move = (ev: PointerEvent) => {
+      if (shook) return;
+      // sample for shake detection
+      samples.push({ t: Date.now(), x: ev.clientX });
+      const cutoff = Date.now() - 600;
+      while (samples.length && samples[0].t < cutoff) samples.shift();
+      if (samples.length >= 4) {
+        let crossings = 0;
+        let prevVel = 0;
+        for (let i = 1; i < samples.length; i++) {
+          const vel = samples[i].x - samples[i - 1].x;
+          if (prevVel !== 0 && Math.sign(vel) !== Math.sign(prevVel)) crossings++;
+          if (vel !== 0) prevVel = vel;
+        }
+        if (crossings >= 3 && onHeaderShake) {
+          shook = true;
+          // snap box back to drag start so the translate happens on stable geometry
+          onUpdate(b => ({ ...b, x: start.bx, y: start.by }));
+          onSnapCandidate(null);
+          // anchor popover at the current pointer pos
+          onHeaderShake({ x: ev.clientX, y: ev.clientY });
+          return;
+        }
+      }
+
       const { dx, dy } = worldDelta(ev.clientX - start.x, ev.clientY - start.y);
       const nx = start.bx + dx, ny = start.by + dy;
       onUpdate(b => ({ ...b, x: nx, y: ny }));
@@ -223,6 +252,7 @@ export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate,
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      if (shook) { onSnapCandidate(null); return; }
       if (lastCandidate) {
         onSnap(box, lastCandidate);
         onSnapCandidate(null);
@@ -331,16 +361,6 @@ export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate,
         </div>
       ) : (
         <>
-          {box.density && (
-            <DensityOverlay
-              text={(() => { const v = box.versions.find(x => x.id === box.currentVid); return v?.text ?? ''; })()}
-              spans={box.density.spans}
-              visual={box.density.visual}
-              width={box.w}
-              height={box.h}
-              fontSize={box.fontSize}
-            />
-          )}
           {(activeSpan || box.pendingSpanDiff) && (
             <SpanOverlay
               text={(() => { const v = box.versions.find(x => x.id === box.currentVid); return v?.text ?? ''; })()}

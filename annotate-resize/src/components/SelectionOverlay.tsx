@@ -10,8 +10,6 @@ interface Props {
   onUpdate: (updater: (b: Box) => Box) => void;
   onStartResize: (dir: string, e: React.PointerEvent) => void;
   onRetry: () => void;
-  onRunDensity: () => void;
-  onRunTranslateBox: (register: string) => void;
 }
 
 const PAD = 4;
@@ -32,7 +30,7 @@ const CURSORS: Record<string, string> = {
   t: 'ns-resize', b: 'ns-resize', l: 'ew-resize', r: 'ew-resize',
 };
 
-export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover, onUpdate, onStartResize, onRetry, onRunDensity, onRunTranslateBox }: Props) {
+export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover, onUpdate, onStartResize, onRetry }: Props) {
   const b = box;
   // screen-space rect of the active pill, used to position the portal popover
   const [pillRect, setPillRect] = useState<DOMRect | null>(null);
@@ -124,8 +122,6 @@ export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover
           🌲 tree-fold: will move to header button (see BoxComponent TODO). */}
       <SidePill x={b.x - 44} y={b.y + 8}   label="↺" title="retry" onClick={() => { onRetry(); }} />
       <SidePill x={b.x - 44} y={b.y + 44}  label="≡" title="versions" onClick={el => handlePillClick('versions', el)} />
-      <SidePill x={b.x - 44} y={b.y + 80}  label="◉" title="density" onClick={() => onRunDensity()} />
-      <SidePill x={b.x - 44} y={b.y + 116} label="🌐" title="translate box" onClick={el => handlePillClick('translate', el)} />
       {/* TODO(span-mini-toolbar): when user has text selected inside this box's textarea,
           show a floating mini-toolbar positioned near the selection.
           Implementation:
@@ -175,12 +171,6 @@ export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover
         document.body
       )}
 
-      {popover === 'translate' && pillRect && createPortal(
-        <Popover anchorRect={pillRect} onClose={onClosePopover}>
-          <TranslateBox onTranslate={r => { onRunTranslateBox(r); onClosePopover(); }} />
-        </Popover>,
-        document.body
-      )}
     </>
   );
 }
@@ -258,28 +248,3 @@ function VersionsList({ box, onUpdate, onClose }: { box: Box; onUpdate: (u: (b: 
   );
 }
 
-function TranslateBox({ onTranslate }: { onTranslate: (register: string) => void }) {
-  const [value, setValue] = useState('');
-  const PRESETS = ['linkedin', 'pirate speak', 'ELI5', 'formal', 'casual'];
-  return (
-    <div style={{ minWidth: 240 }}>
-      <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Translate / rewrite as</div>
-      <input
-        autoFocus
-        value={value}
-        onChange={e => setValue(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter' && value.trim()) onTranslate(value.trim()); }}
-        placeholder="portuguese, pirate speak, linkedin…"
-        style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 8px', font: '13px/1.45 inherit', background: 'var(--panel-2)', marginBottom: 8 }}
-      />
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-        {PRESETS.map(p => (
-          <button key={p} onClick={() => onTranslate(p)} style={{
-            padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border)',
-            background: 'var(--panel-2)', cursor: 'pointer', fontSize: 12,
-          }}>{p}</button>
-        ))}
-      </div>
-    </div>
-  );
-}

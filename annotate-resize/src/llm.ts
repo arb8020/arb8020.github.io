@@ -19,6 +19,7 @@ export function streamLLM(
   onDone: (fullText: string) => void,
   onError: (msg: string) => void,
   maxTokens?: number,
+  signal?: AbortSignal,
 ): () => void {
   const provider = loadActiveProvider();
   const modelId = loadActiveModel();
@@ -27,6 +28,10 @@ export function streamLLM(
   if (!modelId) { onError('no model selected — open settings'); return () => {}; }
 
   let cancelled = false;
+  if (signal) {
+    if (signal.aborted) { cancelled = true; }
+    signal.addEventListener('abort', () => { cancelled = true; });
+  }
   const wordQueue: string[] = [];
   let fullText = '';
   let flushInterval: ReturnType<typeof setInterval> | null = null;
@@ -51,7 +56,7 @@ export function streamLLM(
       const s = stream(model, {
         systemPrompt: '',
         messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-      }, { apiKey, maxTokens: maxTokens ?? 8192 });
+      }, { apiKey, maxTokens: maxTokens ?? 8192, signal });
 
       let wordBuf = '';
       const WORD_RE = /(\S+|\s+)/g;
@@ -94,7 +99,11 @@ export function streamLLM(
   };
 }
 
-export async function callLLM(prompt: string, maxTokens?: number): Promise<string> {
+export class AbortedError extends Error {
+  constructor() { super('aborted'); this.name = 'AbortedError'; }
+}
+
+export async function callLLM(prompt: string, maxTokens?: number, signal?: AbortSignal): Promise<string> {
   const provider = loadActiveProvider();
   const modelId = loadActiveModel();
   const apiKey = loadKey(provider);
@@ -106,8 +115,9 @@ export async function callLLM(prompt: string, maxTokens?: number): Promise<strin
   const res = await complete(model, {
     systemPrompt: '',
     messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-  }, { apiKey, maxTokens: maxTokens ?? 8192 });
+  }, { apiKey, maxTokens: maxTokens ?? 8192, signal });
 
+  if (res.stopReason === 'aborted' || signal?.aborted) throw new AbortedError();
   if (res.stopReason === 'error') throw new Error(res.errorMessage || 'unknown provider error');
 
   const totalCost = res?.usage?.cost?.total;

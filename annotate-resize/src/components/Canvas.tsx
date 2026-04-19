@@ -19,22 +19,21 @@ interface Props {
   onMerge: (dragged: Box, candidate: SnapCandidate) => void;
   onScissor: (boxId: string) => void;
   onStitch: (boxId: string) => void;
-  onRunDensity: (boxId: string) => void;
   onAcceptRewrite: (boxId: string) => void;
   onRejectRewrite: (boxId: string) => void;
   onToggleRewriteTop: (boxId: string) => void;
   onSpanSelected: (boxId: string, start: number, end: number, screenX: number, screenY: number) => void;
-  onRunTranslateBox: (boxId: string, register: string) => void;
   activeSpan: { boxId: string; start: number; end: number; shakeActive?: boolean } | null;
   onShakeDetected: (boxId: string) => void;
   onAcceptSpanDiff: (boxId: string) => void;
   onRejectSpanDiff: (boxId: string) => void;
+  onHeaderShake: (boxId: string, anchor: { x: number; y: number }) => void;
   fitMode: FitMode;
   toast: (msg: string, kind?: string) => void;
 }
 
 export function Canvas({ boxes, selectedId, popover, panzoomRef, onSelect, onUpdateBox,
-                         onTogglePopover, onClosePopover, onRunResize, onMerge, onScissor, onStitch, onRunDensity, onAcceptRewrite, onRejectRewrite, onToggleRewriteTop, onSpanSelected, onRunTranslateBox, activeSpan, onShakeDetected, onAcceptSpanDiff, onRejectSpanDiff, fitMode }: Props) {
+                         onTogglePopover, onClosePopover, onRunResize, onMerge, onScissor, onStitch, onAcceptRewrite, onRejectRewrite, onToggleRewriteTop, onSpanSelected, activeSpan, onShakeDetected, onAcceptSpanDiff, onRejectSpanDiff, onHeaderShake, fitMode }: Props) {
   const [snapCandidate, setSnapCandidate] = useState<SnapCandidate | null>(null);
   const fitFns = useRef<Map<string, () => void>>(new Map());
   const getScale = () => panzoomRef.current?.getScale() ?? 1;
@@ -67,6 +66,7 @@ export function Canvas({ boxes, selectedId, popover, panzoomRef, onSelect, onUpd
             onShakeDetected={() => onShakeDetected(b.id)}
             onAcceptSpanDiff={() => onAcceptSpanDiff(b.id)}
             onRejectSpanDiff={() => onRejectSpanDiff(b.id)}
+            onHeaderShake={anchor => onHeaderShake(b.id, anchor)}
           />
         );
       })}
@@ -126,8 +126,6 @@ export function Canvas({ boxes, selectedId, popover, panzoomRef, onSelect, onUpd
           onClosePopover={onClosePopover}
           onUpdate={updater => onUpdateBox(selectedBox.id, updater)}
           onStartResize={(dir, e) => startResize(e, selectedBox, dir, onUpdateBox, onRunResize, worldDelta, (id) => fitFns.current.get(id)?.())}
-          onRunDensity={() => onRunDensity(selectedBox.id)}
-          onRunTranslateBox={register => onRunTranslateBox(selectedBox.id, register)}
         />
       )}
     </>
