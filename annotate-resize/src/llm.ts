@@ -8,21 +8,93 @@ import type { Model } from '@mariozechner/pi-ai';
 
 export { getModels };
 
-// TODO(streaming): add streamLLM(prompt, onWord, onDone, onError) using pi-ai's stream() function.
-// Pattern:
-//   1. Call stream() instead of complete() to get an AssistantMessageEventStream.
-//   2. Subscribe to text_delta events — push each delta into a word-boundary buffer.
-//   3. A setInterval at ~10ms dequeues one word at a time and calls onWord(word).
-//      This smooths out bursty model output into a steady per-word cadence (see nightly.ink/projects/smooth-stream).
-//   4. On the 'done' event, flush remaining buffer, call onDone(fullText), clear the interval.
-//   5. On 'error', call onError(message).
-// Callers (runResize, stitchBox, etc.) should:
-//   - Write words directly to the textarea DOM node (bypass React state for the hot path).
-//   - Disable the textarea during streaming to prevent mid-stream edits.
-//   - On onDone, commit the final text to React state and re-enable the textarea.
-// Add a 'streamMode' boolean to storage (loadStreamMode/saveStreamMode) and a toggle in Sidebar.
-// runResize and the merge/stitch LLM calls should all branch on streamMode.
-export async function callLLM(prompt: string): Promise<string> {
+// streamLLM: streams tokens word-by-word at a steady 16ms cadence.
+// onWord: called with each word token for direct DOM writes (bypass React state).
+// onDone: called with full text when stream completes — caller commits to state.
+// onError: called on failure.
+// Returns a cancel function.
+export function streamLLM(
+  prompt: string,
+  onWord: (word: string) => void,
+  onDone: (fullText: string) => void,
+  onError: (msg: string) => void,
+  maxTokens?: number,
+): () => void {
+  const provider = loadActiveProvider();
+  const modelId = loadActiveModel();
+  const apiKey = loadKey(provider);
+  if (!apiKey) { onError(`no api key saved for ${provider} — open settings`); return () => {}; }
+  if (!modelId) { onError('no model selected — open settings'); return () => {}; }
+
+  let cancelled = false;
+  const wordQueue: string[] = [];
+  let fullText = '';
+  let flushInterval: ReturnType<typeof setInterval> | null = null;
+  let streamDone = false;
+
+  const flush = () => {
+    if (wordQueue.length > 0) {
+      onWord(wordQueue.shift()!);
+    } else if (streamDone) {
+      if (flushInterval) { clearInterval(flushInterval); flushInterval = null; }
+      onDone(fullText);
+    }
+  };
+
+  flushInterval = setInterval(flush, 16);
+
+  (async () => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const model = getModel(provider as any, modelId as any) as Model<any>;
+      const { stream } = await import('@mariozechner/pi-ai');
+      const s = stream(model, {
+        systemPrompt: '',
+        messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+      }, { apiKey, maxTokens: maxTokens ?? 8192 });
+
+      let wordBuf = '';
+      const WORD_RE = /(\S+|\s+)/g;
+
+      for await (const event of s) {
+        if (cancelled) break;
+        if (event.type === 'text_delta') {
+          fullText += event.delta;
+          wordBuf += event.delta;
+          // split on word boundaries, keep last incomplete token in buffer
+          const tokens = wordBuf.match(WORD_RE);
+          if (tokens) {
+            const last = wordBuf[wordBuf.length - 1];
+            // if last char is whitespace the last token is complete
+            const complete = /\s$/.test(last) ? tokens : tokens.slice(0, -1);
+            wordBuf = /\s$/.test(last) ? '' : (tokens[tokens.length - 1] ?? '');
+            for (const w of complete) wordQueue.push(w);
+          }
+        } else if (event.type === 'error') {
+          if (flushInterval) { clearInterval(flushInterval); flushInterval = null; }
+          onError(event.error.errorMessage || 'stream error');
+          return;
+        } else if (event.type === 'done') {
+          const totalCost = event.message?.usage?.cost?.total;
+          if (typeof totalCost === 'number' && isFinite(totalCost)) addSpend(provider, totalCost);
+        }
+      }
+      // flush remaining word buffer
+      if (wordBuf.trim()) wordQueue.push(wordBuf);
+      streamDone = true;
+    } catch (err: any) {
+      if (flushInterval) { clearInterval(flushInterval); flushInterval = null; }
+      onError(String(err.message || err));
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+    if (flushInterval) { clearInterval(flushInterval); flushInterval = null; }
+  };
+}
+
+export async function callLLM(prompt: string, maxTokens?: number): Promise<string> {
   const provider = loadActiveProvider();
   const modelId = loadActiveModel();
   const apiKey = loadKey(provider);
@@ -34,7 +106,7 @@ export async function callLLM(prompt: string): Promise<string> {
   const res = await complete(model, {
     systemPrompt: '',
     messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-  }, { apiKey });
+  }, { apiKey, maxTokens: maxTokens ?? 8192 });
 
   if (res.stopReason === 'error') throw new Error(res.errorMessage || 'unknown provider error');
 

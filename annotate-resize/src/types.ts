@@ -46,6 +46,33 @@ export interface Box {
   merged?: MergedState; // present only on merged boxes
   density?: DensityState; // present after density scoring
   pendingRewrite?: PendingRewrite;
+
+  // TODO(span-ops): add to Box:
+  //   lockedSpans?: LockedSpan[]   — spans excluded from LLM rewrites
+  //   strikethroughSpans?: StrikethroughSpan[]  — user-marked deletions
+  //   shakeResults?: ShakeResult   — alternative phrasings for a highlighted span
+  //
+  // LockedSpan: { start, end, text }
+  //   - When present, resize/rewrite prompts append:
+  //     "Do not modify the following spans: [list of locked text]"
+  //   - Rendered as a subtle underline (e.g. dotted green) via DensityOverlay-style canvas layer
+  //   - UI: select text → floating mini-toolbar appears (see SelectionOverlay TODO) → click lock icon
+  //
+  // StrikethroughSpan: { start, end }
+  //   - Rendered as red strikethrough via canvas overlay (same layer as density)
+  //   - Optional LLM annotation: "what would this piece lose without this span?"
+  //     Prompt: "The following text has been struck through by the author: '{{span_text}}'
+  //              Full context: '{{box_text}}'
+  //              In 1-2 sentences, what does this piece lose without it? Be specific."
+  //     Result shown as a tooltip/margin note on hover
+  //
+  // ShakeResult: { start, end, originalText, alternatives: string[] }
+  //   - Alternatives shown as a popover with accept-per-item buttons
+  //   - Prompt: "Give 3-5 alternative phrasings for the following span.
+  //              Full context: '{{box_text}}'
+  //              Span to rephrase: '{{span_text}}'
+  //              Reply as a JSON array of strings. No explanation."
+  //   - Accepting replaces span in current version text (new version pushed)
 }
 
 // anchor corner is the corner opposite the dragged corner — stays fixed during resize
@@ -53,6 +80,8 @@ export type AnchorCorner = 'tl' | 'tr' | 'bl' | 'br';
 
 export interface PendingRewrite {
   text: string;
+  originalChars: number; // char count of current version before rewrite
+  targetChars: number;   // char count the user asked for (area ratio)
   // ghost target geometry (what user dragged to)
   targetX: number;
   targetY: number;
@@ -70,7 +99,7 @@ export interface PendingRewrite {
 }
 
 export type FitMode = 'widen' | 'shrink'; // widen: box grows width to fit; shrink: font shrinks to fit
-export type PopoverKind = 'annotation' | 'versions' | null;
+export type PopoverKind = 'annotation' | 'versions' | 'translate' | null;
 export type DensityVisual = 'heatmap' | 'opacity';
 
 export interface DensitySpan {

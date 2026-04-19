@@ -11,6 +11,7 @@ interface Props {
   onStartResize: (dir: string, e: React.PointerEvent) => void;
   onRetry: () => void;
   onRunDensity: () => void;
+  onRunTranslateBox: (register: string) => void;
 }
 
 const PAD = 4;
@@ -31,7 +32,7 @@ const CURSORS: Record<string, string> = {
   t: 'ns-resize', b: 'ns-resize', l: 'ew-resize', r: 'ew-resize',
 };
 
-export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover, onUpdate, onStartResize, onRetry, onRunDensity }: Props) {
+export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover, onUpdate, onStartResize, onRetry, onRunDensity, onRunTranslateBox }: Props) {
   const b = box;
   // screen-space rect of the active pill, used to position the portal popover
   const [pillRect, setPillRect] = useState<DOMRect | null>(null);
@@ -81,6 +82,20 @@ export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover
       <SidePill x={b.x - 44} y={b.y + 44}  label="↺" title="retry" onClick={() => { onRetry(); }} />
       <SidePill x={b.x - 44} y={b.y + 80}  label="≡" title="versions" onClick={el => handlePillClick('versions', el)} />
       <SidePill x={b.x - 44} y={b.y + 116} label="◉" title="density" onClick={() => onRunDensity()} />
+      <SidePill x={b.x - 44} y={b.y + 152} label="🌐" title="translate box" onClick={el => handlePillClick('translate', el)} />
+      {/* TODO(span-mini-toolbar): when user has text selected inside this box's textarea,
+          show a floating mini-toolbar positioned near the selection.
+          Implementation:
+          - BoxComponent listens to textarea mouseup/keyup, reads selectionStart/selectionEnd.
+          - If start !== end, fires onSpanSelected(boxId, start, end) up to App.
+          - App stores activeSpan: { boxId, start, end } in state.
+          - SelectionOverlay (or a new SpanToolbar component) renders a small pill cluster
+            at the selection's screen position (use getBoundingClientRect on the textarea,
+            approximate y via lineHeight * line count, or use pretext charRects if available).
+          - Toolbar icons: 🔒 lock | ⟺ resize (shows +/- slider) | 〜 shake | S̶ strikethrough | 💬 annotate
+          - Each fires the corresponding span-op handler in App.
+          - Toolbar dismisses on selection cleared (selectionstart event) or Escape. */}
+
       {/* TODO(tree-fold): add 🌲 pill at y+152. Calls runTreeFold(boxId).
           LLM reformats text verbatim as Markdown outline tree (no summarization).
           Prompt: "Copy the following content verbatim, format as a tree using outline (- <text>) notation.
@@ -113,6 +128,13 @@ export function SelectionOverlay({ box, popover, onTogglePopover, onClosePopover
       {popover === 'versions' && pillRect && createPortal(
         <Popover anchorRect={pillRect} onClose={onClosePopover}>
           <VersionsList box={b} onUpdate={onUpdate} onClose={onClosePopover} />
+        </Popover>,
+        document.body
+      )}
+
+      {popover === 'translate' && pillRect && createPortal(
+        <Popover anchorRect={pillRect} onClose={onClosePopover}>
+          <TranslateBox onTranslate={r => { onRunTranslateBox(r); onClosePopover(); }} />
         </Popover>,
         document.body
       )}
@@ -189,6 +211,32 @@ function VersionsList({ box, onUpdate, onClose }: { box: Box; onUpdate: (u: (b: 
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function TranslateBox({ onTranslate }: { onTranslate: (register: string) => void }) {
+  const [value, setValue] = useState('');
+  const PRESETS = ['linkedin', 'pirate speak', 'ELI5', 'formal', 'casual'];
+  return (
+    <div style={{ minWidth: 240 }}>
+      <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Translate / rewrite as</div>
+      <input
+        autoFocus
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && value.trim()) onTranslate(value.trim()); }}
+        placeholder="portuguese, pirate speak, linkedin…"
+        style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 8px', font: '13px/1.45 inherit', background: 'var(--panel-2)', marginBottom: 8 }}
+      />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        {PRESETS.map(p => (
+          <button key={p} onClick={() => onTranslate(p)} style={{
+            padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border)',
+            background: 'var(--panel-2)', cursor: 'pointer', fontSize: 12,
+          }}>{p}</button>
+        ))}
+      </div>
     </div>
   );
 }

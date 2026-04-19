@@ -4,20 +4,22 @@ import { Canvas } from './components/Canvas';
 import { Sidebar } from './components/Sidebar';
 import { Toolbar } from './components/Toolbar';
 import { Toast } from './components/Toast';
+import { SpanToolbar, ShakePopover } from './components/SpanToolbar';
 import type { Box, MergedSlot, SnapCandidate, PopoverKind, DensitySpan, AnchorCorner } from './types';
-import { loadFitMode, loadDensityTmpl, loadDensityConcept, loadDensityVisual, loadConfirmRewrite } from './storage';
-import { callLLM } from './llm';
+import { loadFitMode, loadDensityTmpl, loadDensityConcept, loadDensityVisual, loadConfirmRewrite, loadStreamMode } from './storage';
+import { callLLM, streamLLM } from './llm';
 import { loadTmpl, loadUserKeys } from './storage';
 import { validateTmpl, renderTmpl, includedVersionsBlock } from './template';
 
 let nextBoxId = 0;
 
 function makeEmptyBox(x: number, y: number): Box {
+  // start small — fitWiden will grow it when text is pasted/typed
   return {
     id: `box${nextBoxId++}`,
-    x, y, w: 420, h: 220,
+    x, y, w: 160, h: 58,
     versions: [], currentVid: null,
-    calibChars: 0, calibArea: 420 * 220,
+    calibChars: 0, calibArea: 160 * 58,
     annotation: '', fontSize: 14,
   };
 }
@@ -44,9 +46,13 @@ export default function App() {
   const panzoomRef = useRef<PanzoomObject | null>(null);
   const spaceDown = useRef(false);
   const panState = useRef<{ sx: number; sy: number; px: number; py: number } | null>(null);
+  const selectedIdRef = useRef<string | null>(null);
   const [boxes, setBoxes] = useState<Box[]>(() => [makeEmptyBox(120, 120)]);
   const [selectedId, setSelectedId] = useState<string | null>(boxes[0].id);
+  // keep ref in sync so keydown handler (inside useEffect) sees current value without stale closure
+  selectedIdRef.current = selectedId;
   const [popover, setPopover] = useState<{ boxId: string; kind: PopoverKind } | null>(null);
+  const [activeSpan, setActiveSpan] = useState<{ boxId: string; start: number; end: number; screenX: number; screenY: number } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [toasts, setToasts] = useState<{ id: number; msg: string; kind: string }[]>([]);
@@ -91,6 +97,10 @@ export default function App() {
         e.preventDefault();
       }
       if (e.code === 'Escape') { setSelectedId(null); setPopover(null); }
+      if (e.code === 'Backspace' && t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA') {
+        const id = selectedIdRef.current;
+        if (id) { setBoxes(bs => bs.filter(b => b.id !== id)); setSelectedId(null); setPopover(null); }
+      }
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') { spaceDown.current = false; vp.style.cursor = ''; }
@@ -378,13 +388,17 @@ paragraph_2: ${textB}`;
   // =============================================================================
   // rewrite pipeline
   // =============================================================================
-  const runResize = useCallback(async (boxId: string, newArea: number, resizeInfo?: { nx: number; ny: number; nw: number; nh: number; anchor: AnchorCorner }) => {
+  const runResize = useCallback(async (boxId: string, newArea: number, resizeInfo?: { nx: number; ny: number; nw: number; nh: number; origX: number; origY: number; origW: number; origH: number; anchor: AnchorCorner }) => {
     const box = boxes.find(b => b.id === boxId);
     if (!box) return;
 
-    // if confirm mode and we have resize geometry, snap box back to original dims
-    // so it stays at original size while ghost animates to target
-    const origX = box.x, origY = box.y, origW = box.w, origH = box.h;
+    // origX/Y/W/H from resizeInfo is the pre-drag snapshot captured in startResize
+    // box.x/y/w/h at this point is the dragged position (stale from move handler)
+    const origX = resizeInfo?.origX ?? box.x;
+    const origY = resizeInfo?.origY ?? box.y;
+    const origW = resizeInfo?.origW ?? box.w;
+    const origH = resizeInfo?.origH ?? box.h;
+
     if (resizeInfo && loadConfirmRewrite()) {
       updateBox(boxId, b => ({ ...b, x: origX, y: origY, w: origW, h: origH }));
     }
@@ -447,6 +461,8 @@ paragraph_2: ${textB}`;
     const calibArea = box.calibArea || newArea;
     const ratio = newArea / calibArea;
     const targetChars = Math.max(20, Math.round(box.calibChars * ratio));
+    // ~4 chars/token for English; add 50% buffer; clamp to [256, 16384]
+    const smartMaxTokens = Math.min(16384, Math.max(256, Math.round(targetChars / 4 * 1.5)));
     const currentText = parent.text;
     const buildInitialPrompt = () => {
       const vars: Record<string, string> = {
@@ -460,22 +476,20 @@ paragraph_2: ${textB}`;
       return renderTmpl(tmpl, vars);
     };
 
-    updateBox(boxId, b => ({ ...b, _status: 'rewriting…' } as any));
-    try {
-      const initialPrompt = buildInitialPrompt();
-      const text = await callLLM(initialPrompt);
-      if (!text.trim()) throw new Error('LLM returned empty response');
-      // User can re-drag the ghost if the size isn't right — no auto-retry loop.
+    const pct = Math.round((targetChars / Math.max(1, box.calibChars)) * 100);
+    updateBox(boxId, b => ({ ...b, _status: `rewriting: ${targetChars}c | ${pct}%` } as any));
 
+    const commitText = (text: string) => {
+      if (!text.trim()) { toast('rewrite failed: empty response'); updateBox(boxId, b => ({ ...b, _status: '' } as any)); return; }
       if (loadConfirmRewrite()) {
         updateBox(boxId, b => ({
           ...b,
           pendingRewrite: {
             text,
-            targetX: resizeInfo?.nx ?? b.x,
-            targetY: resizeInfo?.ny ?? b.y,
-            targetW: resizeInfo?.nw ?? b.w,
-            targetH: resizeInfo?.nh ?? b.h,
+            originalChars: currentText.length,
+            targetChars,
+            targetX: resizeInfo?.nx ?? b.x, targetY: resizeInfo?.ny ?? b.y,
+            targetW: resizeInfo?.nw ?? b.w, targetH: resizeInfo?.nh ?? b.h,
             origX, origY, origW, origH,
             anchor: resizeInfo?.anchor ?? 'tl',
             topBox: 'ghost',
@@ -491,6 +505,32 @@ paragraph_2: ${textB}`;
           currentVid: newId, _status: '',
         } as any));
       }
+    };
+
+    try {
+      const initialPrompt = buildInitialPrompt();
+
+      if (loadStreamMode() && !loadConfirmRewrite()) {
+        // stream directly to textarea DOM, commit on done
+        const ta = document.querySelector<HTMLTextAreaElement>(`.box[data-id="${boxId}"] textarea.main`);
+        if (ta) {
+          ta.value = '';
+          ta.disabled = true;
+        }
+        await new Promise<void>((resolve, reject) => {
+          streamLLM(
+            initialPrompt,
+            (word) => { if (ta) ta.value += word; },
+            (fullText) => { if (ta) { ta.disabled = false; ta.scrollTop = 0; } commitText(fullText); resolve(); },
+            (msg) => { if (ta) ta.disabled = false; reject(new Error(msg)); },
+            smartMaxTokens,
+          );
+        });
+        return;
+      }
+
+      const text = await callLLM(initialPrompt, smartMaxTokens);
+      commitText(text);
     } catch (err: any) {
       toast(`rewrite failed: ${err.message || err}`);
       updateBox(boxId, b => ({ ...b, _status: '' } as any));
@@ -552,6 +592,152 @@ paragraph_2: ${textB}`;
       updateBox(boxId, b => ({ ...b, _status: '' } as any));
     }
   }, [boxes, toast, updateBox]);
+
+  const runTranslateBox = useCallback(async (boxId: string, register: string) => {
+    const box = boxes.find(b => b.id === boxId);
+    const v = box?.versions.find(v => v.id === box.currentVid);
+    if (!v?.text) return;
+    updateBox(boxId, b => ({ ...b, _status: `translating: ${register}` } as any));
+    try {
+      const text = await callLLM(
+        `Rewrite the following text as ${register}. Preserve all meaning. Reply with the rewritten text only.\n\ntext: ${v.text}`
+      );
+      if (!text.trim()) throw new Error('empty response');
+      const newId = `v${box!.versions.length}`;
+      updateBox(boxId, b => ({
+        ...b,
+        versions: [...b.versions, { id: newId, text, parentId: v.id, targetPct: text.length / v.text.length, included: true, annotation: b.annotation }],
+        currentVid: newId, _status: '',
+      } as any));
+    } catch (err: any) {
+      toast(`translate failed: ${err.message || err}`);
+      updateBox(boxId, b => ({ ...b, _status: '' } as any));
+    }
+  }, [boxes, toast, updateBox]);
+
+  const runTranslateSpan = useCallback(async (boxId: string, start: number, end: number, register: string) => {
+    const box = boxes.find(b => b.id === boxId);
+    const v = box?.versions.find(v => v.id === box.currentVid);
+    if (!v?.text) return;
+    const spanText = v.text.slice(start, end);
+    if (!spanText.trim()) return;
+    setActiveSpan(null);
+    updateBox(boxId, b => ({ ...b, _status: `translating span: ${register}` } as any));
+    try {
+      const translated = await callLLM(
+        `Rewrite the following span as ${register}. Preserve meaning. Match the surrounding style. Reply with the rewritten span only.\n\nFull context: ${v.text}\n\nSpan to rewrite: ${spanText}`
+      );
+      if (!translated.trim()) throw new Error('empty response');
+      const newText = v.text.slice(0, start) + translated + v.text.slice(end);
+      const newId = `v${box!.versions.length}`;
+      updateBox(boxId, b => ({
+        ...b,
+        versions: [...b.versions, { id: newId, text: newText, parentId: v.id, targetPct: newText.length / v.text.length, included: true, annotation: b.annotation }],
+        currentVid: newId, _status: '',
+      } as any));
+    } catch (err: any) {
+      toast(`translate span failed: ${err.message || err}`);
+      updateBox(boxId, b => ({ ...b, _status: '' } as any));
+    }
+  }, [boxes, toast, updateBox]);
+
+  const runShakeSpan = useCallback(async (boxId: string, start: number, end: number) => {
+    const box = boxes.find(b => b.id === boxId);
+    const v = box?.versions.find(v => v.id === box.currentVid);
+    if (!v?.text) return;
+    const spanText = v.text.slice(start, end);
+    if (!spanText.trim()) return;
+    setActiveSpan(null);
+    updateBox(boxId, b => ({ ...b, _status: 'shaking…' } as any));
+    try {
+      const result = await callLLM(
+        `Give 4 alternative phrasings for the following span. Match the style, tone, and register of the original exactly.\nFull context: ${v.text}\nSpan: ${spanText}\nReply as a JSON array of strings only. No explanation.`
+      );
+      const json = result.replace(/^```[a-z]*\n?/m, '').replace(/```$/m, '').trim();
+      const alternatives: string[] = JSON.parse(json);
+      if (!Array.isArray(alternatives)) throw new Error('expected JSON array');
+      updateBox(boxId, b => ({ ...b, _shakeResult: { start, end, originalText: spanText, alternatives }, _status: '' } as any));
+    } catch (err: any) {
+      toast(`shake failed: ${err.message || err}`);
+      updateBox(boxId, b => ({ ...b, _status: '' } as any));
+    }
+  }, [boxes, toast, updateBox]);
+
+  const acceptShake = useCallback((boxId: string, alternative: string) => {
+    setBoxes(bs => bs.map(b => {
+      if (b.id !== boxId) return b;
+      const shake = (b as any)._shakeResult;
+      if (!shake) return b;
+      const v = b.versions.find(v => v.id === b.currentVid);
+      if (!v) return b;
+      const newText = v.text.slice(0, shake.start) + alternative + v.text.slice(shake.end);
+      const newId = `v${b.versions.length}`;
+      return {
+        ...b,
+        versions: [...b.versions, { id: newId, text: newText, parentId: v.id, targetPct: newText.length / v.text.length, included: true, annotation: b.annotation }],
+        currentVid: newId, _shakeResult: undefined,
+      } as any;
+    }));
+  }, []);
+
+  // =============================================================================
+  // TODO(span-ops): span-level operations
+  // All require reading textarea selectionStart/selectionEnd to get the highlighted span.
+  // Capture on textarea mouseup/keyup in BoxComponent, store as { boxId, start, end } in App state.
+  // Show a floating mini-toolbar near the selection (position via getBoundingClientRect of selection,
+  // or approximate via pretext char position map) with icons for each operation below.
+  // =============================================================================
+
+  // TODO(span-lock): implement lockSpan(boxId, start, end).
+  // Adds { start, end, text: currentText.slice(start,end) } to box.lockedSpans[].
+  // Modify buildInitialPrompt in runResize to append:
+  //   "\n\nThe following spans must not be changed:\n" + lockedSpans.map(s => `"${s.text}"`).join('\n')
+  // Render locked spans as dotted green underline via canvas overlay (extend DensityOverlay).
+  // Mini-toolbar icon: 🔒. Second click on a locked span removes the lock.
+
+  // TODO(span-resize): implement runSpanResize(boxId, start, end, targetPct).
+  // targetPct comes from a small slider or +/- buttons in the mini-toolbar (e.g. 50%, 150%).
+  // Prompt:
+  //   "Rewrite only the following span so it is approximately {{target_count}} characters
+  //    (currently {{current_count}} characters). Do not change anything outside the span.
+  //    Preserve the meaning and style of the original.
+  //
+  //    Full text for context:
+  //    {{box_text}}
+  //
+  //    Span to rewrite (chars {{start}}–{{end}}):
+  //    {{span_text}}
+  //
+  //    Reply with the rewritten span text only."
+  // Result: splice into current version text at [start, end], push new version.
+  // Ghost the result the same way as full-box rewrite (pending span rewrite + accept/reject).
+
+  // TODO(span-shake): implement runSpanShake(boxId, start, end).
+  // Gets 3-5 alternative phrasings for the selected span.
+  // Prompt:
+  //   "Give 3-5 alternative phrasings for the following span. Match the style and register exactly.
+  //    Full context: '{{box_text}}'
+  //    Span: '{{span_text}}'
+  //    Reply as a JSON array of strings only."
+  // Result: stored as box.shakeResults = { start, end, originalText, alternatives }.
+  // Rendered as a popover near the span with each alternative as a clickable item.
+  // Accepting: splices alternative into text at [start, end], push new version, clear shakeResults.
+  // Mini-toolbar icon: 〜 or ✦
+
+  // TODO(span-strikethrough): implement toggleStrikethrough(boxId, start, end).
+  // Adds/removes { start, end } from box.strikethroughSpans[].
+  // Rendered as red strikethrough via canvas overlay.
+  // Optional "annotate loss" button in mini-toolbar (appears when span is struck):
+  //   Prompt: "The author has struck through this text: '{{span_text}}'
+  //            Full piece: '{{box_text}}'
+  //            In 1-2 sentences, what does this piece lose without it? Be specific and concrete."
+  //   Result shown as a tooltip on hover over the strikethrough span.
+  // Mini-toolbar icon: S̶ (strikethrough S). Second click removes strikethrough.
+
+  // TODO(annotate): implement runAnnotation(boxIds, highlight, userRequest).
+  // (Full spec in earlier TODO block — freeform conversation / google docs mode.)
+  // This is the entry point for all span-level freeform requests not covered above:
+  // user selects text, types a request, LLM returns Op[] (comment + optional edit hunks).
 
   // TODO(tree-fold): implement runTreeFold(boxId).
   // Sends the box text to LLM with prompt:
@@ -653,11 +839,44 @@ paragraph_2: ${textB}`;
             onAcceptRewrite={acceptRewrite}
             onRejectRewrite={rejectRewrite}
             onToggleRewriteTop={toggleRewriteTop}
+            onSpanSelected={(boxId, s, e, sx, sy) => setActiveSpan({ boxId, start: s, end: e, screenX: sx, screenY: sy })}
+            onRunTranslateBox={runTranslateBox}
             fitMode={loadFitMode()}
             toast={toast}
           />
         </div>
       </div>
+
+      {activeSpan && (
+        <SpanToolbar
+          boxId={activeSpan.boxId}
+          start={activeSpan.start}
+          end={activeSpan.end}
+          screenX={activeSpan.screenX}
+          screenY={activeSpan.screenY}
+          onTranslate={(boxId, s, e, register) => runTranslateSpan(boxId, s, e, register)}
+          onShake={(boxId, s, e) => runShakeSpan(boxId, s, e)}
+          onDismiss={() => setActiveSpan(null)}
+        />
+      )}
+
+      {boxes.map(b => {
+        const shake = (b as any)._shakeResult;
+        if (!shake) return null;
+        const ta = document.querySelector<HTMLTextAreaElement>(`.box[data-id="${b.id}"] textarea.main`);
+        const rect = ta?.getBoundingClientRect();
+        return (
+          <ShakePopover
+            key={b.id}
+            boxId={b.id}
+            result={shake}
+            onAccept={acceptShake}
+            onDismiss={id => updateBox(id, b => ({ ...b, _shakeResult: undefined } as any))}
+            screenX={rect ? rect.left + rect.width / 2 : 400}
+            screenY={rect ? rect.top : 200}
+          />
+        );
+      })}
 
       <button
         className="sidebarToggle"

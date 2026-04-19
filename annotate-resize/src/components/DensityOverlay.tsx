@@ -52,31 +52,46 @@ export function DensityOverlay({ text, spans, visual, width, height, fontSize, p
     const lineHeightPx = fontSize * lineHeight;
     const maxWidth = width - paddingLeft * 2;
 
-    // Build pretext items: one item per character so we can map char offsets to positions.
-    // For performance, group into word-level items instead.
-    const words = splitIntoWordItems(text, font);
-    const prepared = prepareRichInline(words.items);
-
-    // Walk lines, building a charOffset → {x, y, w} map per line
+    // Build charRects by processing each paragraph line separately.
+    // This correctly accounts for \n line breaks that pretext doesn't model.
     const charRects: { x: number; y: number; w: number; h: number }[] = new Array(text.length);
     let lineY = paddingTop;
+    let charOffset = 0;
 
-    walkRichInlineLineRanges(prepared, maxWidth, (line: any) => {
-      for (const frag of line.fragments) {
-        const item = words.items[frag.itemIndex];
-        const startChar = words.offsets[frag.itemIndex];
-        // frag.start.x is relative to line start (left edge of content)
-        const x = paddingLeft + frag.start.x;
-        const fragText = item.text;
-        for (let i = 0; i < fragText.length; i++) {
-          const charIdx = startChar + i;
-          if (charIdx < text.length) {
-            charRects[charIdx] = { x, y: lineY, w: frag.occupiedWidth / fragText.length, h: lineHeightPx };
-          }
-        }
+    const textLines = text.split('\n');
+    for (const line of textLines) {
+      if (line.length === 0) {
+        // blank line — advance lineY and charOffset (for the \n char)
+        lineY += lineHeightPx;
+        charOffset += 1; // the \n character
+        continue;
       }
-      lineY += lineHeightPx;
-    });
+
+      const words = splitIntoWordItems(line, font);
+      if (words.items.length === 0) { charOffset += line.length + 1; lineY += lineHeightPx; continue; }
+
+      const prepared = prepareRichInline(words.items);
+      walkRichInlineLineRanges(prepared, maxWidth, (layoutLine: any) => {
+        let curX = paddingLeft;
+        for (const frag of layoutLine.fragments) {
+          curX += frag.gapBefore;
+          const item = words.items[frag.itemIndex];
+          const fragStartInLine = words.offsets[frag.itemIndex];
+          const fragText = item.text;
+          const charW = frag.occupiedWidth / Math.max(1, fragText.length);
+          for (let i = 0; i < fragText.length; i++) {
+            const charIdx = charOffset + fragStartInLine + i;
+            if (charIdx < text.length) {
+              charRects[charIdx] = { x: curX + i * charW, y: lineY, w: charW, h: lineHeightPx };
+            }
+          }
+          curX += frag.occupiedWidth;
+        }
+        lineY += lineHeightPx;
+      });
+
+      charOffset += line.length + 1; // +1 for the \n
+    }
 
     // Paint spans
     for (const span of spans) {

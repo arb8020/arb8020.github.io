@@ -9,66 +9,85 @@ interface Props {
   fontSize: number;
 }
 
-// Anchor corner → which corner coords to compute for control placement
-function anchorPoint(p: PendingRewrite, useTarget: boolean) {
-  const x = useTarget ? p.targetX : p.origX;
-  const y = useTarget ? p.targetY : p.origY;
-  const w = useTarget ? p.targetW : p.origW;
-  const h = useTarget ? p.targetH : p.origH;
+// Dragged corner = opposite of anchor, computed on the ghost's final dims
+function draggedCornerPoint(p: PendingRewrite, ghostX: number, ghostY: number, ghostW: number, ghostH: number) {
   switch (p.anchor) {
-    case 'tl': return { cx: x, cy: y };
-    case 'tr': return { cx: x + w, cy: y };
-    case 'bl': return { cx: x, cy: y + h };
-    case 'br': return { cx: x + w, cy: y + h };
+    case 'tl': return { cx: ghostX + ghostW, cy: ghostY + ghostH }; // br
+    case 'tr': return { cx: ghostX,          cy: ghostY + ghostH }; // bl
+    case 'bl': return { cx: ghostX + ghostW, cy: ghostY };          // tr
+    case 'br': return { cx: ghostX,          cy: ghostY };          // tl
   }
 }
 
 export function GhostBox({ pending, onAccept, onReject, onToggle, fontSize }: Props) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const [animating, setAnimating] = useState(true);
-  const [dims, setDims] = useState({ x: pending.origX, y: pending.origY, w: pending.origW, h: pending.origH });
+  const [dims, setDims] = useState({ x: pending.origX, y: pending.origY, w: pending.origW, h: pending.origH }); // starts at orig dims, anchored position computed on mount
+
+  // compute ghost position so anchor corner is shared with original box
+  // the ghost may be smaller or larger than the original
+  function anchoredPos(w: number, h: number) {
+    const { origX: ox, origY: oy, origW: ow, origH: oh, anchor } = pending;
+    switch (anchor) {
+      case 'tl': return { x: ox, y: oy };                         // tl fixed
+      case 'tr': return { x: ox + ow - w, y: oy };                // tr fixed
+      case 'bl': return { x: ox, y: oy + oh - h };                // bl fixed
+      case 'br': return { x: ox + ow - w, y: oy + oh - h };       // br fixed
+    }
+  }
 
   // animate from orig → target on mount
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
-      setDims({ x: pending.targetX, y: pending.targetY, w: pending.targetW, h: pending.targetH });
+      const pos = anchoredPos(pending.targetW, pending.targetH);
+      setDims({ x: pos.x, y: pos.y, w: pending.targetW, h: pending.targetH });
       const t = setTimeout(() => setAnimating(false), 220);
       return () => clearTimeout(t);
     });
     return () => cancelAnimationFrame(raf);
-  }, [pending.targetX, pending.targetY, pending.targetW, pending.targetH]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending.targetW, pending.targetH]);
 
+  // set text immediately
   useEffect(() => {
     const ta = taRef.current;
     if (!ta) return;
     ta.value = pending.text;
     ta.scrollTop = 0;
+  }, [pending.text]);
 
-    // fit ghost box to content — same logic as fitWiden in BoxComponent
-    const minW = 120, maxW = 1200;
-    const availH = pending.targetH - 22;
-    let lo = minW, hi = maxW;
-    while (hi - lo > 4) {
-      const mid = Math.round((lo + hi) / 2);
-      ta.style.width = mid + 'px';
-      if (ta.scrollHeight <= availH) { hi = mid; } else { lo = mid; }
-    }
-    ta.style.width = '';
-    const newW = Math.min(maxW, hi + 2);
-    if (newW >= maxW) {
-      ta.style.width = maxW + 'px';
-      ta.style.height = '1px';
-      const needed = ta.scrollHeight;
-      ta.style.height = '';
+  // fit after animation settles — 230ms to ensure transition is done
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const ta = taRef.current;
+      if (!ta) return;
+      const minW = 120, maxW = 1200;
+      const availH = pending.targetH - 22;
+      let lo = minW, hi = maxW;
+      while (hi - lo > 4) {
+        const mid = Math.round((lo + hi) / 2);
+        ta.style.width = mid + 'px';
+        if (ta.scrollHeight <= availH) { hi = mid; } else { lo = mid; }
+      }
       ta.style.width = '';
-      setDims(d => ({ ...d, w: maxW, h: Math.max(80, needed + 22 + 2) }));
-    } else {
-      setDims(d => ({ ...d, w: newW }));
-    }
-  }, [pending.text, pending.targetH]);
+      const newW = Math.min(maxW, hi + 2);
+      if (newW >= maxW) {
+        ta.style.width = maxW + 'px';
+        ta.style.height = '1px';
+        const needed = ta.scrollHeight;
+        ta.style.height = '';
+        ta.style.width = '';
+        setDims(d => ({ ...d, w: maxW, h: Math.max(80, needed + 22 + 2) }));
+      } else if (newW !== pending.targetW) {
+        setDims(d => ({ ...d, w: newW }));
+      }
+      ta.scrollTop = 0;
+    }, 230);
+    return () => clearTimeout(timer);
+  }, [pending.targetW, pending.targetH]); // only re-fit if target dims change, not on every text change
 
   const isGhostOnTop = pending.topBox === 'ghost';
-  const ctrlPt = anchorPoint(pending, false); // controls at anchor on original
+  const ctrlPt = draggedCornerPoint(pending, dims.x, dims.y, dims.w, dims.h);
 
   return (
     <>
@@ -93,7 +112,14 @@ export function GhostBox({ pending, onAccept, onReject, onToggle, fontSize }: Pr
           background: 'rgba(45,127,249,0.08)', borderBottom: '1px solid rgba(45,127,249,0.2)',
           flexShrink: 0, fontSize: 11, color: 'var(--accent)', userSelect: 'none',
         }}>
-          <span>proposed rewrite</span>
+          <span>proposed</span>
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, fontSize: 10, color: 'rgba(45,127,249,0.7)', fontVariantNumeric: 'tabular-nums' }}>
+            <span title="original">{pending.originalChars}c</span>
+            <span>→</span>
+            <span title="intended">{pending.targetChars}c</span>
+            <span>→</span>
+            <span title="proposed" style={{ color: 'var(--accent)', fontWeight: 600 }}>{pending.text.length}c</span>
+          </span>
         </div>
         <textarea
           ref={taRef}

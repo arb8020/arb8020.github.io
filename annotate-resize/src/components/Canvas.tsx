@@ -15,7 +15,7 @@ interface Props {
   onUpdateBox: (id: string, updater: (b: Box) => Box) => void;
   onTogglePopover: (boxId: string, kind: PopoverKind) => void;
   onClosePopover: () => void;
-  onRunResize: (boxId: string, newArea: number, resizeInfo?: { nx: number; ny: number; nw: number; nh: number; anchor: import('../types').AnchorCorner }) => void;
+  onRunResize: (boxId: string, newArea: number, resizeInfo?: { nx: number; ny: number; nw: number; nh: number; origX: number; origY: number; origW: number; origH: number; anchor: import('../types').AnchorCorner }) => void;
   onMerge: (dragged: Box, candidate: SnapCandidate) => void;
   onScissor: (boxId: string) => void;
   onStitch: (boxId: string) => void;
@@ -23,12 +23,14 @@ interface Props {
   onAcceptRewrite: (boxId: string) => void;
   onRejectRewrite: (boxId: string) => void;
   onToggleRewriteTop: (boxId: string) => void;
+  onSpanSelected: (boxId: string, start: number, end: number, screenX: number, screenY: number) => void;
+  onRunTranslateBox: (boxId: string, register: string) => void;
   fitMode: FitMode;
   toast: (msg: string, kind?: string) => void;
 }
 
 export function Canvas({ boxes, selectedId, popover, panzoomRef, onSelect, onUpdateBox,
-                         onTogglePopover, onClosePopover, onRunResize, onMerge, onScissor, onStitch, onRunDensity, onAcceptRewrite, onRejectRewrite, onToggleRewriteTop, fitMode }: Props) {
+                         onTogglePopover, onClosePopover, onRunResize, onMerge, onScissor, onStitch, onRunDensity, onAcceptRewrite, onRejectRewrite, onToggleRewriteTop, onSpanSelected, onRunTranslateBox, fitMode }: Props) {
   const [snapCandidate, setSnapCandidate] = useState<SnapCandidate | null>(null);
   const fitFns = useRef<Map<string, () => void>>(new Map());
   const getScale = () => panzoomRef.current?.getScale() ?? 1;
@@ -56,6 +58,7 @@ export function Canvas({ boxes, selectedId, popover, panzoomRef, onSelect, onUpd
             onSnapCandidate={setSnapCandidate}
             onSnap={(dragged, candidate) => onMerge({ ...dragged }, candidate)}
             registerFit={fn => fitFns.current.set(b.id, fn)}
+            onSpanSelected={(s, e, sx, sy) => onSpanSelected(b.id, s, e, sx, sy)}
           />
         );
       })}
@@ -108,7 +111,7 @@ export function Canvas({ boxes, selectedId, popover, panzoomRef, onSelect, onUpd
 
       {selectedBox && (
         <SelectionOverlay
-          onRetry={() => onRunResize(selectedBox.id, selectedBox.w * selectedBox.h, { nx: selectedBox.x, ny: selectedBox.y, nw: selectedBox.w, nh: selectedBox.h, anchor: 'tl' })}
+          onRetry={() => onRunResize(selectedBox.id, selectedBox.w * selectedBox.h, { nx: selectedBox.x, ny: selectedBox.y, nw: selectedBox.w, nh: selectedBox.h, origX: selectedBox.x, origY: selectedBox.y, origW: selectedBox.w, origH: selectedBox.h, anchor: 'tl' })}
           box={selectedBox}
           popover={popover?.boxId === selectedBox.id ? popover.kind : null}
           onTogglePopover={kind => onTogglePopover(selectedBox.id, kind)}
@@ -116,6 +119,7 @@ export function Canvas({ boxes, selectedId, popover, panzoomRef, onSelect, onUpd
           onUpdate={updater => onUpdateBox(selectedBox.id, updater)}
           onStartResize={(dir, e) => startResize(e, selectedBox, dir, onUpdateBox, onRunResize, worldDelta, (id) => fitFns.current.get(id)?.())}
           onRunDensity={() => onRunDensity(selectedBox.id)}
+          onRunTranslateBox={register => onRunTranslateBox(selectedBox.id, register)}
         />
       )}
     </>
@@ -127,7 +131,7 @@ function startResize(
   box: Box,
   dir: string,
   onUpdateBox: (id: string, updater: (b: Box) => Box) => void,
-  onRunResize: (boxId: string, area: number, resizeInfo?: { nx: number; ny: number; nw: number; nh: number; anchor: import('../types').AnchorCorner }) => void,
+  onRunResize: (boxId: string, area: number, resizeInfo?: { nx: number; ny: number; nw: number; nh: number; origX: number; origY: number; origW: number; origH: number; anchor: import('../types').AnchorCorner }) => void,
   worldDelta: (dx: number, dy: number) => { dx: number; dy: number },
   onEdgeResizeDone: (boxId: string) => void,
 ) {
@@ -169,7 +173,7 @@ function startResize(
     const isCorner = dir.length === 2;
     if (isCorner && Math.abs(endArea - startArea) / startArea >= 0.05) {
       const anchor = anchorMap[dir] ?? 'tl';
-      onRunResize(box.id, endArea, { nx, ny, nw, nh, anchor });
+      onRunResize(box.id, endArea, { nx, ny, nw, nh, origX: start.bx, origY: start.by, origW: start.bw, origH: start.bh, anchor });
     } else if (!isCorner) {
       // edge resize: no LLM call, but trigger fit to prevent overflow
       onEdgeResizeDone(box.id);

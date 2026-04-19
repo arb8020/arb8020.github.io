@@ -68,9 +68,8 @@ export const saveResizeTolerance = (v: number) => localStorage.setItem(K.resizeT
 export const loadConfirmRewrite = (): boolean => localStorage.getItem('ar.confirmRewrite') !== 'false'; // default on
 export const saveConfirmRewrite = (v: boolean) => localStorage.setItem('ar.confirmRewrite', String(v));
 
-// TODO(streaming): add stream mode key and load/save here.
-// export const loadStreamMode = (): boolean => localStorage.getItem(K.streamMode) === 'true';
-// export const saveStreamMode = (v: boolean) => localStorage.setItem(K.streamMode, String(v));
+export const loadStreamMode = (): boolean => localStorage.getItem('ar.streamMode') !== 'false'; // default on
+export const saveStreamMode = (v: boolean) => localStorage.setItem('ar.streamMode', String(v));
 // Also add a toggle in Sidebar under "Box sizing" section: "stream LLM output word-by-word".
 
 export const loadKey = (p: string) => localStorage.getItem(K.providerKey(p)) || '';

@@ -21,6 +21,7 @@ interface Props {
   onScissor: () => void;
   onStitch: () => void;
   registerFit: (fn: () => void) => void;
+  onSpanSelected: (start: number, end: number, screenX: number, screenY: number) => void;
 }
 
 // Returns the 4 edge midpoints of a box in world coords
@@ -56,7 +57,7 @@ function computeGhost(dragged: Box, target: Box, dragEdge: 'T' | 'B' | 'L' | 'R'
   }
 }
 
-export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate, fitMode, worldDelta, onSnapCandidate, onSnap, onScissor, onStitch, registerFit }: Props) {
+export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate, fitMode, worldDelta, onSnapCandidate, onSnap, onScissor, onStitch, registerFit, onSpanSelected }: Props) {
   const taRefA = useRef<HTMLTextAreaElement>(null);
   const taRefB = useRef<HTMLTextAreaElement>(null);
 
@@ -92,9 +93,9 @@ export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate,
       ta.style.height = '';
       ta.style.width = '';
       const newH = Math.max(80, needed + 22 + 2);
-      onUpdate(b => ({ ...b, w: maxW, h: newH, fontSize: 14 }));
+      onUpdate(b => ({ ...b, w: maxW, h: newH, fontSize: 14, calibArea: maxW * newH, calibChars: b.versions.find(v=>v.id===b.currentVid)?.text.length ?? b.calibChars }));
     } else if (newW !== box.w) {
-      onUpdate(b => ({ ...b, w: newW, fontSize: 14 }));
+      onUpdate(b => ({ ...b, w: newW, fontSize: 14, calibArea: newW * b.h, calibChars: b.versions.find(v=>v.id===b.currentVid)?.text.length ?? b.calibChars }));
     }
   }, [box.w, box.h, onUpdate]);
 
@@ -246,6 +247,9 @@ export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate,
         background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6,
         boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        opacity: box.pendingRewrite?.topBox === 'ghost' ? 0.35 : 1,
+        transition: 'opacity 0.15s',
+        zIndex: box.pendingRewrite?.topBox === 'ghost' ? 8 : 10,
       }}
       onPointerDown={e => { if (e.button !== 0) return; onSelect(); e.stopPropagation(); }}
     >
@@ -260,6 +264,10 @@ export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate,
         onPointerDown={handleDragHeader}
       >
         <span>{box.id}</span>
+        {(() => {
+          const currentChars = box.versions.find(v => v.id === box.currentVid)?.text.length ?? 0;
+          return <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 4 }}>{currentChars}c</span>;
+        })()}
         <span style={{ marginLeft: 'auto', fontSize: 11, color: box.pendingRewrite ? 'var(--accent)' : 'var(--muted)' }}>
           {box.pendingRewrite ? 'review rewrite' : ((box as any)._status || '')}
         </span>
@@ -302,6 +310,22 @@ export function BoxComponent({ box, isSelected: _, allBoxes, onSelect, onUpdate,
             style={{ ...taStyle(box.fontSize), position: 'relative', zIndex: 1, background: 'transparent' }}
             onInput={() => handleInput('A')}
             onPaste={() => handlePaste('A')}
+            onMouseUp={e => {
+              const ta = e.currentTarget;
+              const { selectionStart: s, selectionEnd: end } = ta;
+              if (s !== null && end !== null && s !== end) {
+                const rect = ta.getBoundingClientRect();
+                onSpanSelected(s, end, rect.left + rect.width / 2, rect.top);
+              }
+            }}
+            onKeyUp={e => {
+              const ta = e.currentTarget;
+              const { selectionStart: s, selectionEnd: end } = ta;
+              if (s !== null && end !== null && s !== end) {
+                const rect = ta.getBoundingClientRect();
+                onSpanSelected(s, end, rect.left + rect.width / 2, rect.top);
+              }
+            }}
           />
         </>
       )}
