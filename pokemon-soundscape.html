@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pokémon Soundscape</title>
+<style>
+  :root {
+    --paper: #f6f1e3;
+    --ink: #2a2620;
+    --rule: #c9bfa6;
+    --rule-soft: #e3dac0;
+    --accent: #5a7a3d;        /* moss */
+    --accent-deep: #3e5628;
+    --accent-warn: #8a3a2a;
+    --muted: #6b6353;
+    --hl: #f0e6c8;
+  }
+  html, body { background: var(--paper); }
+  body {
+    font-family: "Iowan Old Style", "Charter", "Georgia", serif;
+    font-size: 17px; line-height: 1.45;
+    max-width: 860px; margin: 2.4em auto; padding: 0 1.4em;
+    color: var(--ink);
+  }
+
+  /* Hamburger + sidebar */
+  #hamburger {
+    position: fixed; top: 1.2em; right: 1.4em;
+    width: 36px; height: 36px;
+    background: var(--paper); border: 1px solid var(--ink); border-radius: 4px;
+    cursor: pointer; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 4px;
+  }
+  #hamburger span {
+    display: block; width: 18px; height: 2px; background: var(--ink);
+  }
+  #sidebar {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 360px; max-width: 90vw;
+    background: var(--paper); border-left: 1px solid var(--rule);
+    box-shadow: -2px 0 12px rgba(0,0,0,0.08);
+    overflow-y: auto; padding: 4em 1.4em 1.4em 1.4em;
+    transform: translateX(100%); transition: transform 0.18s ease-out;
+    z-index: 99;
+  }
+  #sidebar.open { transform: translateX(0); }
+  #sidebar section.panel:first-of-type { margin-top: 0; border-top: none; padding-top: 0; }
+  #sidebar h3 {
+    font-size: 0.78em; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--muted);
+    margin: 1.4em 0 0.6em 0;
+  }
+  #sidebar h3:first-child { margin-top: 0; }
+  details.advanced summary {
+    font-size: 0.78em; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--muted);
+    cursor: pointer; padding: 0.6em 0;
+    border-top: 1px solid var(--rule);
+    margin-top: 1em;
+  }
+
+  /* Search bar */
+  #searchWrap { position: relative; margin: 1.2em 0; }
+  #searchInput {
+    width: 100%; padding: 0.7em 0.9em; font-size: 1.05em;
+    background: #fffaf0; border: 1px solid var(--rule); border-radius: 4px;
+    font-family: inherit; color: var(--ink);
+  }
+  #searchInput:focus { outline: none; border-color: var(--accent); }
+  #searchResults {
+    position: absolute; top: 100%; left: 0; right: 0;
+    background: var(--paper); border: 1px solid var(--rule);
+    border-top: none; border-radius: 0 0 4px 4px;
+    max-height: 320px; overflow-y: auto;
+    z-index: 50;
+    display: none;
+  }
+  #searchResults.open { display: block; }
+  #searchResults .result {
+    padding: 0.5em 0.9em; cursor: pointer;
+    border-bottom: 1px solid var(--rule-soft);
+    font-size: 0.95em;
+  }
+  #searchResults .result:hover, #searchResults .result.active {
+    background: var(--hl);
+  }
+  #searchResults .result .tag {
+    color: var(--muted); font-size: 0.82em; margin-right: 0.5em;
+    font-variant: small-caps; letter-spacing: 0.04em;
+  }
+  #searchResults .result .area { color: var(--muted); font-size: 0.85em; }
+
+  /* BGM resolution trace */
+  .trace { background: #efe7d0; border: 1px solid var(--rule-soft); border-radius: 3px; padding: 0.5em 0.7em; }
+  .trace .step { display: flex; gap: 0.5em; margin: 0.25em 0; align-items: baseline; line-height: 1.3; }
+  .trace .step .arrow { color: var(--muted); font-family: "SF Mono", Menlo, monospace; }
+  .trace .step .label { color: var(--muted); font-variant: small-caps; letter-spacing: 0.06em; min-width: 4.5em; font-size: 0.82em; }
+  .trace .step .val { font-family: "SF Mono", Menlo, monospace; font-size: 0.82em; word-break: break-word; }
+  .trace .step .val.picked { color: var(--accent-deep); font-weight: 600; }
+  .trace .step .val.error { color: var(--accent-warn); }
+  .trace details { margin-top: 0.4em; }
+  .trace details summary { color: var(--muted); font-size: 0.78em; cursor: pointer; }
+  .trace .row { font-family: "SF Mono", Menlo, monospace; font-size: 0.78em; padding: 0.15em 0; color: var(--muted); }
+  .trace .row.picked { color: var(--accent-deep); font-weight: 600; }
+  h1 {
+    font-family: "Iowan Old Style", "Charter", "Georgia", serif;
+    font-size: 1.9em; font-weight: 700; letter-spacing: 0.01em;
+    margin: 0; padding-bottom: 0.1em; border-bottom: 2px solid var(--ink);
+  }
+  .sub { color: var(--muted); font-style: italic; margin: 0.3em 0 1.4em 0; }
+
+  section.panel {
+    border: none; padding: 0; margin: 1.6em 0;
+    border-top: 1px solid var(--rule);
+    padding-top: 0.9em;
+  }
+  section.panel > h2 {
+    font-size: 0.78em; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--muted);
+    margin: 0 0 0.7em 0;
+  }
+
+  label { display: inline-block; margin: 0.25em 0; color: var(--ink); }
+  input[type="text"], select {
+    padding: 0.3em 0.45em; font-size: 0.95em;
+    background: #fffaf0; border: 1px solid var(--rule);
+    border-radius: 2px; color: var(--ink);
+    font-family: inherit;
+  }
+  input[type="number"] { width: 4.5em; padding: 0.3em; background: #fffaf0; border: 1px solid var(--rule); border-radius: 2px; }
+  input[type="range"] { vertical-align: middle; accent-color: var(--accent); }
+  small { color: var(--muted); }
+
+  button {
+    padding: 0.42em 0.95em; font-size: 0.92em; cursor: pointer;
+    background: var(--paper); color: var(--ink);
+    border: 1px solid var(--ink); border-radius: 2px;
+    font-family: inherit; letter-spacing: 0.02em;
+    transition: background 0.1s;
+  }
+  button:hover:not(:disabled) { background: var(--hl); }
+  button:disabled { color: var(--muted); border-color: var(--rule); cursor: not-allowed; }
+  button.primary { background: var(--accent); color: #fffaf0; border-color: var(--accent-deep); }
+  button.primary:hover:not(:disabled) { background: var(--accent-deep); }
+  button.stop { background: var(--accent-warn); color: #fffaf0; border-color: var(--accent-warn); }
+
+  #status {
+    margin: 0.6em 0; font-family: "SF Mono", Menlo, monospace;
+    font-size: 0.82em; color: var(--muted); min-height: 1.2em;
+  }
+  details.log-details summary {
+    cursor: pointer; color: var(--muted); font-size: 0.82em;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 0.3em 0; user-select: none;
+  }
+  #log {
+    font-family: "SF Mono", Menlo, monospace; font-size: 0.78em;
+    background: #efe7d0; color: var(--ink);
+    padding: 0.6em 0.8em; border-radius: 2px;
+    height: 9em; overflow-y: auto; white-space: pre-wrap;
+    border: 1px solid var(--rule-soft);
+  }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.95em; }
+  th, td { text-align: left; padding: 0.4em 0.7em; border-bottom: 1px solid var(--rule-soft); }
+  th {
+    font-size: 0.74em; font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--rule);
+    background: transparent;
+  }
+  td.species { font-variant: small-caps; letter-spacing: 0.04em; }
+  td.num { font-family: "SF Mono", Menlo, monospace; font-size: 0.88em; color: var(--muted); text-align: right; }
+
+  .row-flex { display: flex; gap: 1.1em; align-items: center; flex-wrap: wrap; }
+  .row-flex > label { margin: 0; }
+
+  .help { color: var(--muted); font-size: 0.85em; font-style: italic; margin: 0.5em 0 0 0; }
+
+  /* Sprite pop-up stage */
+  #stage {
+    position: relative;
+    height: 110px;
+    margin: 1em 0 0 0;
+    overflow: hidden;
+    border-top: 1px dashed var(--rule);
+    border-bottom: 1px dashed var(--rule);
+    background:
+      repeating-linear-gradient(
+        90deg,
+        transparent 0 18px,
+        rgba(90, 122, 61, 0.04) 18px 36px
+      );
+  }
+  .sprite {
+    position: absolute;
+    bottom: 4px;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    width: 96px; height: 96px;
+    animation: sprite-life 4.2s ease-out forwards;
+    pointer-events: none;
+  }
+  .sprite img { width: 100%; height: 100%; object-fit: contain; }
+  .sprite .sprite-label {
+    position: absolute; bottom: -6px; left: 50%;
+    transform: translateX(-50%);
+    font-variant: small-caps; letter-spacing: 0.06em;
+    font-size: 0.78em; color: var(--ink);
+    background: var(--paper); padding: 0 0.3em;
+    white-space: nowrap;
+  }
+  @keyframes sprite-life {
+    0%   { opacity: 0; transform: translateY(20px) scale(0.85); }
+    10%  { opacity: 1; transform: translateY(0) scale(1.05); }
+    18%  { transform: translateY(-6px) scale(1); }
+    26%  { transform: translateY(0) scale(1); }
+    34%  { transform: translateY(-3px) scale(1); }
+    42%  { transform: translateY(0) scale(1); }
+    80%  { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-12px) scale(0.95); }
+  }
+
+  /* Bulbapedia connections / location map */
+  #connections { display: flex; gap: 0.5em; flex-wrap: wrap; margin: 0.4em 0; }
+  #connections button { font-size: 0.88em; }
+  #locationMapWrap, #regionMapWrap { position: relative; display: inline-block; max-width: 100%; }
+  #locationMap, #regionMap { display: block; width: 432px; max-width: 100%; height: auto; image-rendering: pixelated; }
+  #layoutImg { display: block; max-width: 100%; height: auto; image-rendering: pixelated; margin-top: 0.6em; }
+  #layoutCaption { color: var(--muted); font-style: italic; font-size: 0.85em; margin-top: 0.2em; }
+  #locationOverlay, #regionOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #regionOverlay rect { pointer-events: auto; cursor: pointer; fill: rgba(90,122,61,0); stroke: rgba(90,122,61,0.4); stroke-width: 1; transition: fill 0.12s, stroke 0.12s; }
+  #regionOverlay rect:hover { fill: rgba(90,122,61,0.4); stroke: rgba(90,122,61,0.9); }
+  #regionOverlay rect.current { stroke: var(--accent-warn); stroke-width: 1.5; fill: rgba(138,58,42,0.18); }
+  #locationOverlay polygon, #locationOverlay rect { pointer-events: auto; cursor: pointer; fill: rgba(90,122,61,0); transition: fill 0.15s; }
+  #locationOverlay polygon:hover, #locationOverlay rect:hover { fill: rgba(90,122,61,0.25); }
+  .map-caption { color: var(--muted); font-style: italic; font-size: 0.88em; margin-top: 0.3em; }
+</style>
+</head>
+<body>
+
+<button id="hamburger" aria-label="Toggle controls">
+  <span></span><span></span><span></span>
+</button>
+
+<h1 id="routeTitle">Pokémon Soundscape</h1>
+<p class="sub" id="routeSub">A walk through the tall grass.</p>
+
+<!-- Layer 1: search bar -->
+<div id="searchWrap">
+  <input id="searchInput" type="text" placeholder="Search a location… (e.g. 'wayward 1f', 'sinnoh/route 208', 'twinleaf')" autocomplete="off">
+  <div id="searchResults"></div>
+</div>
+
+<!-- Layer 1: walk controls -->
+<div class="row-flex" style="margin-bottom:1em;">
+  <button id="start" class="primary" disabled>Start walking</button>
+  <button id="stop" class="stop" disabled>Stop</button>
+  <button id="playBgm">Play music only</button>
+  <button id="pauseBgm" disabled>Pause music</button>
+  <span id="bgmStatus" style="flex:1;font-family:'SF Mono',Menlo,monospace;font-size:0.85em;color:var(--muted);">no track loaded</span>
+</div>
+
+<!-- Layer 1: layout image (the artwork) -->
+<section class="panel" id="layoutPanel" style="display:none;border-top:none;padding-top:0;margin-top:0;">
+  <img id="layoutImg" alt="" style="display:none;">
+  <div id="layoutCaption" class="map-caption" style="display:none;"></div>
+</section>
+
+<!-- Layer 1: encounters area (sprite stage) -->
+<section class="panel" style="border-top:none;padding-top:0;">
+  <div id="stage"></div>
+</section>
+
+<!-- Layer 1: map + connections -->
+<section class="panel" id="locationPanel" style="display:none;">
+  <h2>Map</h2>
+  <div id="connections"></div>
+  <div id="locationMapWrap">
+    <img id="locationMap" alt="">
+    <svg id="locationOverlay" preserveAspectRatio="none"></svg>
+  </div>
+  <div class="map-caption" id="mapCaption"></div>
+</section>
+
+<!-- Sidebar: layer 2 / 3 controls -->
+<aside id="sidebar">
+  <h3>Encounter table</h3>
+  <div id="encounters"><em style="color:var(--muted)">none loaded</em></div>
+
+  <h3>Background music</h3>
+  <div class="row-flex">
+    <button id="searchBgm">Search</button>
+    <button id="changeBgm" disabled>Change pick</button>
+  </div>
+  <div id="bgmTrace" style="margin-top:0.6em;font-size:0.85em;"></div>
+  <div id="bgmPicker" style="margin-top:0.6em;"></div>
+  <label style="margin-top:0.6em;display:block;">Vol
+    <input id="bgmVol" type="range" min="0" max="1" step="0.05" value="0.6">
+  </label>
+
+  <h3>Version</h3>
+  <div class="row-flex">
+    <select id="version">
+      <option value="platinum" selected>Platinum</option>
+    </select>
+    <select id="method">
+      <option value="walk" selected>walk (grass)</option>
+      <option value="surf">surf</option>
+      <option value="old-rod">old-rod</option>
+      <option value="good-rod">good-rod</option>
+      <option value="super-rod">super-rod</option>
+      <option value="horde">horde (ORAS/XY)</option>
+      <option value="rock-smash">rock-smash</option>
+      <option value="headbutt">headbutt (HGSS)</option>
+      <option value="dark-grass">dark-grass (BW)</option>
+      <option value="grass-spots">grass-spots</option>
+      <option value="cave-spots">cave-spots</option>
+      <option value="bridge-spots">bridge-spots</option>
+      <option value="surf-spots">surf-spots</option>
+      <option value="seaweed">seaweed</option>
+    </select>
+    <select id="tod">
+      <option value="auto" selected>auto (local)</option>
+      <option value="time-morning">morning</option>
+      <option value="time-day">day</option>
+      <option value="time-night">night</option>
+      <option value="any">any</option>
+    </select>
+  </div>
+
+  <h3>Walk parameters</h3>
+  <div class="row-flex">
+    <label>Step (s)
+      <input id="stepMean" type="number" min="0.2" step="0.1" value="1.0">
+    </label>
+    <label>Enc rate
+      <input id="encRate" type="number" min="0.001" max="1" step="0.01" value="0.10">
+    </label>
+    <label>Cry vol
+      <input id="vol" type="range" min="0" max="1" step="0.05" value="0.35">
+    </label>
+  </div>
+  <div class="row-flex" style="margin-top:0.4em;">
+    <label><input id="wanderOn" type="checkbox"> Wander</label>
+    <label>Wander rate
+      <input id="wanderRate" type="number" min="0" max="1" step="0.001" value="0.005">
+    </label>
+  </div>
+  <span id="wanderStatus" style="font-family:'SF Mono',Menlo,monospace;font-size:0.78em;color:var(--muted);"></span>
+
+  <details class="advanced">
+    <summary>Advanced</summary>
+    <label style="margin-top:0.5em;display:block;">Slug
+      <input id="slug" type="text" value="sinnoh-route-201-area" size="32">
+    </label>
+    <label style="margin-top:0.5em;display:block;">Proxy
+      <input id="proxy" type="text" value="http://localhost:8787" size="32">
+    </label>
+    <button id="load" style="margin-top:0.6em;">Reload</button>
+    <button id="rebuildIndex" style="margin-top:0.6em;">Rebuild search index</button>
+  </details>
+</aside>
+
+<div id="status"></div>
+<details class="log-details">
+  <summary>log</summary>
+  <div id="log"></div>
+</details>
+
+<script>
+"use strict";
+
+const POKEAPI = "https://pokeapi.co/api/v2";
+
+const $ = (id) => document.getElementById(id);
+const status = (msg) => { $("status").textContent = msg; };
+const log = (msg) => {
+  const el = $("log");
+  const ts = new Date().toLocaleTimeString();
+  el.textContent = `[${ts}] ${msg}\n` + el.textContent;
+};
+
+// State
+let encounters = []; // [{name, chance, cryUrl}]
+let walking = false;
+let walkTimer = null;
+let audioCtx = null;
+let masterGain = null;
+let bgmGain = null;
+let bgmSource = null;     // currently-playing AudioBufferSourceNode (loop)
+let bgmBuffer = null;     // decoded audio buffer for current track
+let bgmStartedAt = 0;     // audioCtx.currentTime when BGM source started
+let currentConnections = []; // [{slug, name, direction}, ...] from Bulbapedia
+
+function ensureAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 1.0;
+  masterGain.connect(audioCtx.destination);
+  bgmGain = audioCtx.createGain();
+  bgmGain.gain.value = parseFloat($("bgmVol").value);
+  bgmGain.connect(masterGain);
+}
+
+// --- Data loading ---
+
+// Gen IV time bands: morning 04:00-09:59, day 10:00-19:59, night 20:00-03:59.
+function localTimeBand() {
+  const h = new Date().getHours();
+  if (h >= 4 && h < 10) return "time-morning";
+  if (h >= 10 && h < 20) return "time-day";
+  return "time-night";
+}
+
+async function loadEncounters() {
+  const slug = $("slug").value.trim();
+  const version = $("version").value;
+  const method = $("method").value;
+  const todChoice = $("tod").value;
+  const band = todChoice === "auto" ? localTimeBand()
+             : todChoice === "any" ? null
+             : todChoice;
+  if (todChoice === "auto") {
+    log(`local time band: ${band}`);
+  }
+
+  status(`Fetching ${slug}...`);
+
+  let area;
+  try {
+    const res = await fetch(`${POKEAPI}/location-area/${slug}`);
+    if (res.status === 404) {
+      // No location-area in PokéAPI — typical for towns / interiors with no wild encounters.
+      // Clear the encounter table but don't wedge the UI; let the location panel still load.
+      encounters = [];
+      $("encounters").innerHTML = `<em style="color:var(--muted)">no wild encounters here (PokéAPI has no location-area for this slug)</em>`;
+      $("start").disabled = true;
+      status(`No wild encounters: ${slug}`);
+      log(`no encounters for ${slug} (404)`);
+      return;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    area = await res.json();
+  } catch (e) {
+    status(`Failed to load location-area: ${e.message}`);
+    log(`load failed: ${e.message}`);
+    // Keep prior encounters; don't disable Start if they were valid.
+    return;
+  }
+  $("start").disabled = true;
+
+  // Filter encounters by version + method + time band.
+  // An encounter_detail matches the band if either:
+  //   (a) we're in "any" mode (band === null), OR
+  //   (b) it has no time condition_values (time-agnostic), OR
+  //   (c) it has a condition_value matching the band.
+  const TIME_VALUES = new Set(["time-morning", "time-day", "time-night"]);
+  const tally = new Map(); // name -> {chance, url}
+  for (const enc of area.pokemon_encounters) {
+    const vd = enc.version_details.find((v) => v.version.name === version);
+    if (!vd) continue;
+    let chanceSum = 0;
+    for (const ed of vd.encounter_details) {
+      if (ed.method.name !== method) continue;
+      const timeConds = ed.condition_values
+        .map((c) => c.name)
+        .filter((n) => TIME_VALUES.has(n));
+      const matches = band === null
+        || timeConds.length === 0
+        || timeConds.includes(band);
+      if (!matches) continue;
+      chanceSum += ed.chance;
+    }
+    if (chanceSum > 0) {
+      tally.set(enc.pokemon.name, {
+        name: enc.pokemon.name,
+        url: enc.pokemon.url,
+        chance: chanceSum,
+      });
+    }
+  }
+
+  if (tally.size === 0) {
+    encounters = [];
+    // Diagnose: what version/method combinations DO have data on this area?
+    const available = new Map(); // version -> Set(methods)
+    for (const enc of area.pokemon_encounters) {
+      for (const vd of enc.version_details) {
+        const ms = available.get(vd.version.name) || new Set();
+        for (const ed of vd.encounter_details) ms.add(ed.method.name);
+        available.set(vd.version.name, ms);
+      }
+    }
+    let html = `<em style="color:var(--muted)">no encounters for ${version} / ${method}.</em>`;
+    if (available.size > 0) {
+      html += `<div style="margin-top:0.5em;font-size:0.85em;color:var(--muted)">PokéAPI has data for:</div><ul style="margin:0.3em 0 0 1.2em;padding:0;font-size:0.85em;color:var(--muted)">`;
+      for (const [ver, methods] of [...available.entries()].sort()) {
+        html += `<li><b>${ver}</b>: ${[...methods].sort().join(", ")}</li>`;
+      }
+      html += `</ul>`;
+    }
+    status(`No encounters found for ${version} / ${method}.`);
+    $("encounters").innerHTML = html;
+    $("start").disabled = true;
+    return;
+  }
+
+  status(`Fetching cries for ${tally.size} species...`);
+  const list = [...tally.values()];
+
+  // Fetch each pokemon resource for cry URL + sprite.
+  await Promise.all(list.map(async (p) => {
+    try {
+      const r = await fetch(p.url);
+      const data = await r.json();
+      p.cryUrl = data.cries?.latest || data.cries?.legacy || null;
+      // Prefer Gen IV Platinum sprite (fits the route), then DP, then default front.
+      const gen4 = data.sprites?.versions?.["generation-iv"];
+      p.spriteUrl =
+        gen4?.platinum?.front_default ||
+        gen4?.["diamond-pearl"]?.front_default ||
+        gen4?.["heartgold-soulsilver"]?.front_default ||
+        data.sprites?.front_default ||
+        null;
+    } catch (e) {
+      p.cryUrl = null;
+      p.spriteUrl = null;
+    }
+  }));
+
+  encounters = list.filter((p) => p.cryUrl); // sprite is optional, cry is required
+  renderTable();
+  status(`Loaded ${encounters.length} species.`);
+  $("start").disabled = false;
+}
+
+function renderTable() {
+  const total = encounters.reduce((s, p) => s + p.chance, 0);
+  let html = `<table><thead><tr><th>Species</th><th style="text-align:right">Chance</th><th style="text-align:right">Normalized</th></tr></thead><tbody>`;
+  for (const p of [...encounters].sort((a, b) => b.chance - a.chance)) {
+    const norm = ((p.chance / total) * 100).toFixed(1);
+    html += `<tr><td class="species">${p.name}</td><td class="num">${p.chance}</td><td class="num">${norm}%</td></tr>`;
+  }
+  html += `</tbody></table>`;
+  $("encounters").innerHTML = html;
+}
+
+// --- Sampling ---
+
+// Exponentially-distributed waiting time, mean = mean.
+function expDelay(mean) {
+  return -Math.log(1 - Math.random()) * mean;
+}
+
+function sampleSpecies() {
+  const total = encounters.reduce((s, p) => s + p.chance, 0);
+  let r = Math.random() * total;
+  for (const p of encounters) {
+    r -= p.chance;
+    if (r <= 0) return p;
+  }
+  return encounters[encounters.length - 1];
+}
+
+// --- Audio ---
+
+async function playCry(url) {
+  ensureAudio();
+  try {
+    const res = await fetch(url);
+    const buf = await res.arrayBuffer();
+    const decoded = await audioCtx.decodeAudioData(buf);
+    const src = audioCtx.createBufferSource();
+    const gain = audioCtx.createGain();
+    gain.gain.value = parseFloat($("vol").value);
+    src.buffer = decoded;
+    src.connect(gain).connect(masterGain);
+    src.start();
+  } catch (e) {
+    log(`cry failed: ${e.message}`);
+  }
+}
+
+// --- Walk loop ---
+
+function scheduleNextStep() {
+  if (!walking) return;
+  const mean = parseFloat($("stepMean").value);
+  const delayMs = expDelay(mean) * 1000;
+  walkTimer = setTimeout(async () => {
+    if (!walking) return;
+
+    // Encounter roll.
+    const p = parseFloat($("encRate").value);
+    if (encounters.length > 0 && Math.random() < p) {
+      const sp = sampleSpecies();
+      log(`encounter: ${sp.name}`);
+      playCry(sp.cryUrl);
+      popSprite(sp);
+    }
+
+    // Wander roll. Hard floor: BGM must have completed at least one full loop.
+    if ($("wanderOn").checked) {
+      const wRate = parseFloat($("wanderRate").value);
+      const elapsed = audioCtx ? audioCtx.currentTime - bgmStartedAt : 0;
+      const loopsDone = (bgmBuffer && bgmStartedAt > 0) ? elapsed / bgmBuffer.duration : 0;
+      $("wanderStatus").textContent = `loops: ${loopsDone.toFixed(2)}`;
+      if (loopsDone >= 1 && currentConnections.length > 0 && Math.random() < wRate) {
+        const next = currentConnections[Math.floor(Math.random() * currentConnections.length)];
+        log(`wander → ${next.name} (${next.slug})`);
+        // Clear sprites; they belong to the previous location.
+        $("stage").innerHTML = "";
+        // Swap slug and trigger Load. walking stays true so the loop survives.
+        $("slug").value = next.slug;
+        // Don't click the button (re-enters the click handler with our handler);
+        // call the navigation directly.
+        await navigateTo(next.slug);
+        // After navigation, fall through and reschedule the next step on the new location.
+      }
+    }
+
+    scheduleNextStep();
+  }, delayMs);
+}
+
+// Internal navigation (used by wander; wraps loadEncounters + loadLocationInfo + BGM).
+async function navigateTo(slug) {
+  $("slug").value = slug;
+  await loadEncounters();
+  loadLocationInfo();
+  const restored = await tryRestoreBgm();
+  if (!restored) await searchBgm();
+  // If we're walking and a new BGM buffer is loaded, ensure it's playing.
+  if (walking && bgmBuffer && !bgmSource) startBgm();
+}
+
+// Sprite pop-up. Appends an element to #stage at a random horizontal position,
+// CSS animation handles entry/bounce/exit, then we remove the node.
+function popSprite(species) {
+  if (!species.spriteUrl) return;
+  const stage = $("stage");
+  const sw = stage.clientWidth || 600;
+  const el = document.createElement("div");
+  el.className = "sprite";
+  // Random x within stage, leaving margin for the sprite width.
+  const margin = 60;
+  const x = Math.max(margin, Math.min(sw - margin, margin + Math.random() * (sw - 2 * margin))) - 48;
+  el.style.left = `${x}px`;
+  el.innerHTML = `<img src="${species.spriteUrl}" alt="${species.name}"><span class="sprite-label">${species.name}</span>`;
+  stage.appendChild(el);
+  setTimeout(() => el.remove(), 4400);
+}
+
+function startWalk() {
+  if (encounters.length === 0) { status("Load encounters first."); return; }
+  ensureAudio();
+  // AudioContext is suspended until a user gesture — startWalk is a click, so resume here.
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  walking = true;
+  $("start").disabled = true;
+  $("stop").disabled = false;
+  status("Walking...");
+  log("started walking");
+  startBgm();
+  $("playBgm").disabled = true;
+  $("pauseBgm").disabled = false;
+  scheduleNextStep();
+}
+
+function stopWalk() {
+  walking = false;
+  if (walkTimer) clearTimeout(walkTimer);
+  walkTimer = null;
+  $("start").disabled = encounters.length === 0;
+  $("stop").disabled = true;
+  stopBgm();
+  $("playBgm").disabled = !bgmBuffer;
+  $("pauseBgm").disabled = true;
+  status("Stopped.");
+  log("stopped");
+}
+
+function startBgm() {
+  if (!bgmBuffer) return; // no track loaded
+  if (bgmSource) return;  // already playing
+  bgmSource = audioCtx.createBufferSource();
+  bgmSource.buffer = bgmBuffer;
+  bgmSource.loop = true; // gapless loop via Web Audio
+  bgmSource.connect(bgmGain);
+  bgmSource.start();
+  bgmStartedAt = audioCtx.currentTime;
+}
+
+function stopBgm() {
+  if (!bgmSource) return;
+  try { bgmSource.stop(); } catch {}
+  bgmSource.disconnect();
+  bgmSource = null;
+}
+
+// --- BGM (khinsider via proxy) ---
+
+const bgmKey = () => {
+  const tb = effectiveTimeBand() || "any";
+  return `bgm:${$("slug").value.trim()}:${$("version").value}:${tb}`;
+};
+
+// Resolve the user-effective time band (auto -> map to local tz -> day/morning/night).
+function effectiveTimeBand() {
+  const choice = $("tod").value;
+  if (choice === "auto") {
+    const b = localTimeBand(); // "time-morning" | "time-day" | "time-night"
+    return b.replace(/^time-/, "");
+  }
+  if (choice === "any") return null;
+  return choice.replace(/^time-/, "");
+}
+
+async function searchBgm() {
+  const slug = $("slug").value.trim();
+  const version = $("version").value;
+  const proxy = $("proxy").value.trim().replace(/\/$/, "");
+  const tb = effectiveTimeBand();
+  status(`Searching BGM for ${slug} (${version}${tb ? ", " + tb : ""})...`);
+  let data;
+  try {
+    const url = `${proxy}/bgm/search?slug=${encodeURIComponent(slug)}&version=${version}${tb ? "&timeBand=" + tb : ""}`;
+    const res = await fetch(url);
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  } catch (e) {
+    status(`BGM search failed: ${e.message}`);
+    log(`bgm search failed: ${e.message}`);
+    return;
+  }
+  // Render the resolution trace regardless of whether we got candidates.
+  renderBgmTrace(slug, version, tb, data);
+
+  if (!data.candidates || data.candidates.length === 0) {
+    status(`No BGM candidates for ${slug}.`);
+    $("bgmPicker").innerHTML = `<em>No matches in album ${data.album}.</em>`;
+    return;
+  }
+  log(`bgm: ${data.candidates.length} candidates from ${data.album}`);
+
+  // Render picker.
+  const opts = data.candidates.map((c, i) =>
+    `<option value="${i}">${c.title} (score ${c.score})</option>`
+  ).join("");
+  $("bgmPicker").innerHTML = `
+    <label>Pick track:
+      <select id="bgmSelect">${opts}</select>
+    </label>
+    <button id="bgmPick">Use this track</button>
+  `;
+  // Stash candidates for the pick handler.
+  window._bgmCandidates = data.candidates;
+
+  $("bgmPick").addEventListener("click", () => {
+    const idx = parseInt($("bgmSelect").value, 10);
+    pickBgm(window._bgmCandidates[idx]);
+  });
+
+  // Auto-pick top candidate.
+  pickBgm(data.candidates[0]);
+}
+
+// Render the slug -> Bulbapedia row -> track title -> album candidates -> picked
+// resolution chain in the sidebar so the reasoning is visible.
+function renderBgmTrace(slug, version, timeBand, data) {
+  const trace = data.bulbaTrace || {};
+  const picked = data.candidates?.[0];
+  const escape = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+  // Step 1: input. Step 2: Bulbapedia. Step 3: chosen track title. Step 4: album match.
+  let html = `<div class="trace">`;
+  html += `<div class="step"><span class="label">input</span><span class="val">${escape(slug)} · ${escape(version)} · ${escape(timeBand || "any")}</span></div>`;
+
+  if (trace.error) {
+    html += `<div class="step"><span class="arrow">↓</span><span class="label">bulba</span><span class="val error">${escape(trace.error)}</span></div>`;
+  } else if (trace.allRows && trace.allRows.length > 0) {
+    const matched = trace.matchedRow;
+    html += `<div class="step"><span class="arrow">↓</span><span class="label">bulba</span><span class="val">page: ${escape(trace.title)}</span></div>`;
+    if (matched) {
+      html += `<div class="step"><span class="arrow">↓</span><span class="label">row</span><span class="val picked">[${matched.games.join(",")}] ${escape(matched.situation || "—")} → "${escape(matched.trackTitle)}"</span></div>`;
+      html += `<div class="step"><span class="arrow">·</span><span class="label">why</span><span class="val">${escape(trace.pickReason)}</span></div>`;
+    }
+    if (trace.allRows.length > 1) {
+      html += `<details><summary>all ${trace.allRows.length} music rows on Bulbapedia</summary>`;
+      for (const r of trace.allRows) {
+        const isPicked = matched && r.trackTitle === matched.trackTitle && r.situation === matched.situation;
+        html += `<div class="row${isPicked ? " picked" : ""}">[${r.games.join(",")}] ${escape(r.situation || "—")} → "${escape(r.trackTitle)}"</div>`;
+      }
+      html += `</details>`;
+    }
+  } else {
+    html += `<div class="step"><span class="arrow">↓</span><span class="label">bulba</span><span class="val error">${escape(trace.pickReason || "no music section parsed; falling back to slug tokens")}</span></div>`;
+    html += `<div class="step"><span class="arrow">↓</span><span class="label">tokens</span><span class="val">${escape((data.tokens || []).join(" "))}</span></div>`;
+  }
+
+  if (picked) {
+    html += `<div class="step"><span class="arrow">↓</span><span class="label">album</span><span class="val">${escape(data.album)}</span></div>`;
+    html += `<div class="step"><span class="arrow">↓</span><span class="label">picked</span><span class="val picked">${escape(picked.title)} (score ${picked.score})</span></div>`;
+    if (data.candidates.length > 1) {
+      html += `<details><summary>other candidates (${data.candidates.length - 1})</summary>`;
+      for (const c of data.candidates.slice(1)) {
+        html += `<div class="row">${escape(c.title)} (score ${c.score})</div>`;
+      }
+      html += `</details>`;
+    }
+  } else {
+    html += `<div class="step"><span class="arrow">↓</span><span class="label">album</span><span class="val error">no candidates matched</span></div>`;
+  }
+  html += `</div>`;
+  $("bgmTrace").innerHTML = html;
+}
+
+async function loadBgmBuffer(mp3Url) {
+  ensureAudio();
+  const proxy = $("proxy").value.trim().replace(/\/$/, "");
+  // Stream through proxy to get CORS for decodeAudioData.
+  const streamUrl = `${proxy}/bgm/stream?url=${encodeURIComponent(mp3Url)}`;
+  const res = await fetch(streamUrl);
+  if (!res.ok) throw new Error(`stream HTTP ${res.status}`);
+  const buf = await res.arrayBuffer();
+  bgmBuffer = await audioCtx.decodeAudioData(buf);
+}
+
+async function pickBgm(candidate) {
+  const proxy = $("proxy").value.trim().replace(/\/$/, "");
+  status(`Resolving "${candidate.title}"...`);
+  let data;
+  try {
+    const res = await fetch(`${proxy}/bgm/resolve?trackUrl=${encodeURIComponent(candidate.trackUrl)}`);
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  } catch (e) {
+    status(`BGM resolve failed: ${e.message}`);
+    log(`bgm resolve failed: ${e.message}`);
+    return;
+  }
+  status(`Decoding "${candidate.title}"...`);
+  try {
+    // If BGM is currently playing, stop it before swapping the buffer.
+    stopBgm();
+    await loadBgmBuffer(data.mp3Url);
+    // If we were walking, restart BGM with the new buffer.
+    if (walking) startBgm();
+  } catch (e) {
+    status(`BGM decode failed: ${e.message}`);
+    log(`bgm decode failed: ${e.message}`);
+    return;
+  }
+  $("bgmStatus").textContent = `▶ ${candidate.title}`;
+  status(`BGM ready: ${candidate.title}`);
+  log(`bgm picked: ${candidate.title}`);
+  localStorage.setItem(bgmKey(), JSON.stringify({ candidate, mp3Url: data.mp3Url }));
+  $("changeBgm").disabled = false;
+}
+
+async function tryRestoreBgm() {
+  const saved = localStorage.getItem(bgmKey());
+  if (!saved) return false;
+  try {
+    const { candidate, mp3Url } = JSON.parse(saved);
+    stopBgm();
+    await loadBgmBuffer(mp3Url);
+    $("bgmStatus").textContent = `▶ ${candidate.title}`;
+    status(`BGM restored: ${candidate.title}`);
+    log(`bgm restored from cache: ${candidate.title}`);
+    $("changeBgm").disabled = false;
+    if (walking) startBgm();
+    return true;
+  } catch (e) {
+    log(`bgm restore failed: ${e.message}`);
+    return false;
+  }
+}
+
+// --- Bulbapedia location info ---
+
+async function loadLocationInfo() {
+  const slug = $("slug").value.trim();
+  const proxy = $("proxy").value.trim().replace(/\/$/, "");
+  let data;
+  try {
+    const res = await fetch(`${proxy}/location/info?slug=${encodeURIComponent(slug)}`);
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  } catch (e) {
+    log(`location info failed: ${e.message}`);
+    $("locationPanel").style.display = "none";
+    return;
+  }
+
+  $("locationPanel").style.display = "";
+  // Connections
+  currentConnections = data.connections || [];
+  const cont = $("connections");
+  cont.innerHTML = "";
+  const arrowFor = (d) => ({ west: "←", east: "→", north: "↑", south: "↓", near: "≈" })[d] || "•";
+  for (const c of data.connections) {
+    const btn = document.createElement("button");
+    btn.textContent = `${arrowFor(c.direction)} ${c.name}`;
+    btn.title = c.slug;
+    btn.addEventListener("click", () => {
+      $("slug").value = c.slug;
+      $("load").click();
+    });
+    cont.appendChild(btn);
+  }
+  if (data.connections.length === 0) {
+    cont.innerHTML = `<small style="color:var(--muted)">no connecting locations parsed</small>`;
+  }
+
+  // Map image + highlight
+  const mapImg = $("locationMap");
+  $("mapCaption").textContent = `Location of ${data.title.replace(/_/g, " ")} in Sinnoh.`;
+  if (data.mapImageUrl) {
+    // Stream through proxy for CORS so we can read pixels.
+    mapImg.crossOrigin = "anonymous";
+    mapImg.src = `${proxy}/location/image?url=${encodeURIComponent(data.mapImageUrl)}`;
+    mapImg.onload = () => detectHighlight(mapImg, data.title);
+    mapImg.style.display = "";
+  } else {
+    mapImg.removeAttribute("src");
+    mapImg.style.display = "none";
+    $("locationOverlay").innerHTML = "";
+  }
+
+  // Layout image for the selected version (falls back to any available).
+  const version = $("version").value;
+  const layoutImg = $("layoutImg");
+  const layoutCap = $("layoutCaption");
+  const layoutPanel = $("layoutPanel");
+  const layoutUrl = data.layouts && (data.layouts[version] || Object.values(data.layouts)[0]);
+  if (layoutUrl) {
+    layoutImg.src = `${proxy}/location/image?url=${encodeURIComponent(layoutUrl)}`;
+    layoutImg.style.display = "";
+    const usedVersion = data.layouts[version] ? version : Object.keys(data.layouts)[0];
+    layoutCap.textContent = `Layout (${usedVersion}).`;
+    layoutCap.style.display = "";
+    layoutPanel.style.display = "";
+  } else {
+    layoutImg.removeAttribute("src");
+    layoutImg.style.display = "none";
+    layoutCap.style.display = "none";
+    layoutPanel.style.display = "none";
+  }
+
+  // Update route title in the header.
+  const displayName = data.title.replace(/_/g, " ");
+  $("routeTitle").textContent = displayName;
+  $("routeSub").textContent = `${$("version").value} · ${$("tod").value === "auto" ? "auto" : $("tod").value.replace("time-", "")}`;
+}
+
+// Detect the highlighted region on a Bulbapedia location map.
+// Bulbapedia uses a cyan/pale-cyan to mark the current location. We find
+// pixels matching that hue and compute their bounding box, then draw an
+// SVG rect overlay (single hotspot — fine for v1; can upgrade to convex hull later).
+function detectHighlight(img, title) {
+  const overlay = $("locationOverlay");
+  overlay.innerHTML = "";
+  // viewBox matches image natural size so we can use pixel coords directly.
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (!w || !h) return;
+  overlay.setAttribute("viewBox", `0 0 ${w} ${h}`);
+
+  // Draw to canvas to read pixels.
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  let data;
+  try {
+    ctx.drawImage(img, 0, 0);
+    data = ctx.getImageData(0, 0, w, h).data;
+  } catch (e) {
+    log(`highlight detect: canvas tainted (${e.message})`);
+    return;
+  }
+
+  // Bulbapedia highlight is pale cyan. Match: high B, high G, low-ish R, R<G,B.
+  // Be permissive: r<200, g>180, b>180, b>=g-20, b-r > 30.
+  let minX = w, minY = h, maxX = 0, maxY = 0, count = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const r = data[i], g = data[i+1], b = data[i+2];
+      if (r < 200 && g > 180 && b > 180 && (b - r) > 30) {
+        count++;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (count < 4) {
+    log(`highlight detect: no cyan pixels found for ${title}`);
+    return;
+  }
+  // Pad slightly.
+  const pad = 2;
+  minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+  maxX = Math.min(w - 1, maxX + pad); maxY = Math.min(h - 1, maxY + pad);
+  const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  rect.setAttribute("x", minX);
+  rect.setAttribute("y", minY);
+  rect.setAttribute("width", maxX - minX);
+  rect.setAttribute("height", maxY - minY);
+  rect.setAttribute("rx", "2");
+  rect.style.stroke = "rgba(90,122,61,0.7)";
+  rect.style.strokeWidth = "1";
+  rect.addEventListener("click", () => {
+    log(`clicked highlight for ${title}`);
+  });
+  overlay.appendChild(rect);
+  log(`highlight: ${count} px, bbox ${minX},${minY} ${maxX-minX}x${maxY-minY}`);
+}
+
+// --- Region master map (Sinnoh) ---
+//
+// Strategy: enumerate Sinnoh locations from PokéAPI. For each, ask the proxy for
+// its Bulbapedia map URL, load through CORS proxy, detect cyan highlight bbox.
+// Cache per slug in localStorage. Render all bboxes as clickable rects on a shared
+// base map (we use the first successfully-fetched map as the base — they share the
+// same base layer; the highlight is just an overlay).
+
+const REGION_KEY = "region:sinnoh:v1";
+
+function loadRegionCache() {
+  try { return JSON.parse(localStorage.getItem(REGION_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveRegionCache(c) { localStorage.setItem(REGION_KEY, JSON.stringify(c)); }
+
+async function discoverSinnohSlugs() {
+  // /region/sinnoh -> locations[].url -> each location -> areas[].name
+  const r = await fetch(`${POKEAPI}/region/sinnoh`);
+  const region = await r.json();
+  const slugs = [];
+  await Promise.all(region.locations.map(async (loc) => {
+    try {
+      const lr = await fetch(loc.url);
+      const ld = await lr.json();
+      for (const a of ld.areas) slugs.push({ slug: a.name, locationName: ld.name });
+    } catch {}
+  }));
+  return slugs;
+}
+
+// Detect cyan highlight in an Image, return {x,y,w,h} in image-pixel coords or null.
+function detectHighlightFromImage(img) {
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (!w || !h) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0);
+  let data;
+  try { data = ctx.getImageData(0, 0, w, h).data; }
+  catch { return null; }
+  let minX = w, minY = h, maxX = 0, maxY = 0, count = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const r = data[i], g = data[i+1], b = data[i+2];
+      if (r < 200 && g > 180 && b > 180 && (b - r) > 30) {
+        count++;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (count < 4) return null;
+  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1, naturalW: w, naturalH: h };
+}
+
+async function fetchHighlightForSlug(slug, proxy) {
+  // 1) Get Bulbapedia map URL via proxy.
+  const infoRes = await fetch(`${proxy}/location/info?slug=${encodeURIComponent(slug)}`);
+  const info = await infoRes.json();
+  if (!info.mapImageUrl) return null;
+  // 2) Load image through proxy for CORS.
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+    img.src = `${proxy}/location/image?url=${encodeURIComponent(info.mapImageUrl)}`;
+  });
+  const hl = detectHighlightFromImage(img);
+  if (!hl) return null;
+  return { ...hl, mapImageUrl: info.mapImageUrl, name: slug.replace(/-area$/, "").replace(/-/g, " ") };
+}
+
+async function buildRegion() {
+  const proxy = $("proxy").value.trim().replace(/\/$/, "");
+  $("regionStatus").textContent = "discovering...";
+  const slugInfos = await discoverSinnohSlugs();
+  $("regionStatus").textContent = `${slugInfos.length} areas; fetching highlights...`;
+  const cache = loadRegionCache();
+  let baseMapUrl = null;
+  let done = 0;
+
+  // Sequential to be polite to the proxy + Bulbapedia.
+  for (const { slug, locationName } of slugInfos) {
+    if (cache[slug]) {
+      done++;
+      if (!baseMapUrl) baseMapUrl = cache[slug].mapImageUrl;
+      continue;
+    }
+    try {
+      const hl = await fetchHighlightForSlug(slug, proxy);
+      if (hl) {
+        hl.locationName = locationName;
+        cache[slug] = hl;
+        if (!baseMapUrl) baseMapUrl = hl.mapImageUrl;
+        saveRegionCache(cache);
+      }
+    } catch (e) {
+      log(`region: ${slug} failed: ${e.message}`);
+    }
+    done++;
+    $("regionStatus").textContent = `${done}/${slugInfos.length} (${Object.keys(cache).length} highlights)`;
+  }
+  $("regionStatus").textContent = `done: ${Object.keys(cache).length} clickable regions`;
+  renderRegion();
+}
+
+function renderRegion() {
+  const cache = loadRegionCache();
+  const entries = Object.entries(cache);
+  if (entries.length === 0) {
+    $("regionMapWrap").style.display = "none";
+    $("regionCaption").style.display = "none";
+    return;
+  }
+  $("regionMapWrap").style.display = "";
+  $("regionCaption").style.display = "";
+  const proxy = $("proxy").value.trim().replace(/\/$/, "");
+  // Use any cached map as the base — the base layer is identical for every Sinnoh location map.
+  const baseUrl = entries[0][1].mapImageUrl;
+  const img = $("regionMap");
+  img.src = `${proxy}/location/image?url=${encodeURIComponent(baseUrl)}`;
+  const overlay = $("regionOverlay");
+  // Use the first entry's natural dims for viewBox (all maps share dims).
+  const { naturalW, naturalH } = entries[0][1];
+  overlay.setAttribute("viewBox", `0 0 ${naturalW} ${naturalH}`);
+  overlay.innerHTML = "";
+  const currentSlug = $("slug").value.trim();
+  for (const [slug, hl] of entries) {
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", hl.x);
+    rect.setAttribute("y", hl.y);
+    rect.setAttribute("width", hl.w);
+    rect.setAttribute("height", hl.h);
+    rect.setAttribute("rx", "1.5");
+    if (slug === currentSlug) rect.classList.add("current");
+    const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+    title.textContent = hl.name + (hl.locationName && hl.locationName !== hl.name ? ` (${hl.locationName})` : "");
+    rect.appendChild(title);
+    rect.addEventListener("click", () => {
+      $("slug").value = slug;
+      $("load").click();
+    });
+    overlay.appendChild(rect);
+  }
+}
+
+// Region/master-map UI removed for now — clicking around via per-location
+// connections is the navigation mode. The functions above are kept dormant
+// so we can wire it back later without re-deriving anything.
+
+// --- Region / Location / Area cascading picker (PokéAPI list endpoints) ---
+//
+// /region                -> { results: [{name, url}, ...] }
+// /region/<name>         -> { locations: [{name, url}, ...] }
+// /location/<name>       -> { areas: [{name, url}, ...] }
+//
+// Areas are what we actually load (their .name is the location-area slug).
+
+// Region -> versions, in chronological order. Hand-curated; covers everything we
+// have BGM albums for. PokéAPI's /region/<r>.version_groups gives us this too,
+// but the values are version-group slugs ("ruby-sapphire") not individual versions
+// and we'd need a second fetch to expand. Hardcoding is faster and more honest.
+const REGION_VERSIONS = {
+  kanto: ["red", "blue", "yellow", "firered", "leafgreen"],
+  johto: ["gold", "silver", "crystal", "heartgold", "soulsilver"],
+  hoenn: ["ruby", "sapphire", "emerald", "omega-ruby", "alpha-sapphire"],
+  sinnoh: ["diamond", "pearl", "platinum"],
+  unova: ["black", "white", "black-2", "white-2"],
+  kalos: ["x", "y"],
+};
+
+function fillVersions(region) {
+  const sel = $("version");
+  const prev = sel.value;
+  sel.innerHTML = "";
+  const versions = REGION_VERSIONS[region] || [];
+  if (versions.length === 0) {
+    const opt = document.createElement("option");
+    opt.value = ""; opt.textContent = "(unsupported region)";
+    sel.appendChild(opt);
+    return;
+  }
+  for (const v of versions) {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    sel.appendChild(opt);
+  }
+  // Restore previous selection if still valid; else pick the last (latest) version.
+  if (versions.includes(prev)) sel.value = prev;
+  else sel.value = versions[versions.length - 1];
+}
+
+// --- Search index (fzf-style across regions/locations/areas) ---
+//
+// Index entries: { slug, region, locationName, areaName, display }.
+// Built once per region from PokéAPI (region -> locations -> areas), cached in
+// localStorage. The user types into a single search bar; we tokenize the query
+// (with `/` as a stronger separator), require every token to substring-match
+// the display, and rank by word-start hits and tightness.
+
+const SEARCH_INDEX_KEY = "searchIndex:v2"; // bumped: rows now include game version
+const SEARCH_REGIONS = Object.keys(REGION_VERSIONS); // kanto/johto/hoenn/sinnoh/unova/kalos
+
+let searchIndex = []; // [{slug, region, locationName, areaName, display, displayLower}]
+
+function loadSearchIndex() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(SEARCH_INDEX_KEY));
+    if (Array.isArray(cached) && cached.length > 0) {
+      searchIndex = cached;
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+async function buildSearchIndex() {
+  log("building search index...");
+  const out = [];
+  for (const region of SEARCH_REGIONS) {
+    try {
+      const r = await fetch(`${POKEAPI}/region/${region}`);
+      const region_data = await r.json();
+      const locations = await Promise.all(region_data.locations.map(async (loc) => {
+        try {
+          const lr = await fetch(loc.url);
+          return await lr.json();
+        } catch { return null; }
+      }));
+      const versions = REGION_VERSIONS[region] || [];
+      for (const loc of locations) {
+        if (!loc || !loc.areas) continue;
+        const locName = loc.name;
+        for (const area of loc.areas) {
+          const areaName = area.name.replace(new RegExp(`^${locName}-?`), "").replace(/-area$/, "") || "main";
+          // Emit one row per game version available in this region. This is
+          // optimistic — some (region × version × area) combos have no PokéAPI
+          // encounter data, surfaced via the empty-table diagnostic on Load.
+          for (const version of versions) {
+            const display = `${region} / ${version} / ${locName.replace(/-/g, " ")} / ${areaName.replace(/-/g, " ")}`;
+            out.push({
+              slug: area.name,
+              region,
+              version,
+              locationName: locName,
+              areaName,
+              display,
+              displayLower: display.toLowerCase(),
+            });
+          }
+        }
+      }
+    } catch (e) {
+      log(`region ${region} index failed: ${e.message}`);
+    }
+  }
+  searchIndex = out;
+  localStorage.setItem(SEARCH_INDEX_KEY, JSON.stringify(out));
+  log(`search index: ${out.length} entries`);
+}
+
+function searchScore(displayLower, queryTokens) {
+  let score = 0;
+  let lastIdx = -1;
+  for (const tok of queryTokens) {
+    const idx = displayLower.indexOf(tok);
+    if (idx < 0) return -Infinity; // every token must appear
+    // Word-start bonus.
+    if (idx === 0 || /[\s/]/.test(displayLower[idx - 1])) score += 5;
+    else score += 1;
+    // Contiguous bonus: this token starts after the previous one ended (within a few chars).
+    if (lastIdx >= 0 && idx - lastIdx < tok.length + 8) score += 2;
+    lastIdx = idx + tok.length;
+  }
+  // Shorter display = more specific = slight bump.
+  score -= displayLower.length * 0.01;
+  return score;
+}
+
+function runSearch(query) {
+  if (!query.trim()) return [];
+  // Tokenize on whitespace and `/`; lowercase.
+  const tokens = query.toLowerCase().split(/[\s/]+/).filter(Boolean);
+  if (tokens.length === 0) return [];
+  return searchIndex
+    .map((e) => ({ entry: e, score: searchScore(e.displayLower, tokens) }))
+    .filter((r) => r.score > -Infinity)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);
+}
+
+function renderSearchResults(results) {
+  const cont = $("searchResults");
+  if (results.length === 0) { cont.classList.remove("open"); cont.innerHTML = ""; return; }
+  cont.innerHTML = results.map((r, i) => {
+    const e = r.entry;
+    return `<div class="result" data-idx="${i}" data-slug="${e.slug}" data-version="${e.version}" data-region="${e.region}">
+      <span class="tag">${e.region} / ${e.version}</span>
+      <span>${e.locationName.replace(/-/g, " ")}</span>
+      ${e.areaName !== "main" ? `<span class="area"> / ${e.areaName.replace(/-/g, " ")}</span>` : ""}
+    </div>`;
+  }).join("");
+  cont.classList.add("open");
+}
+
+let searchActive = -1;
+function setSearchActive(idx) {
+  const results = $("searchResults").querySelectorAll(".result");
+  if (results.length === 0) return;
+  searchActive = (idx + results.length) % results.length;
+  results.forEach((el, i) => el.classList.toggle("active", i === searchActive));
+  results[searchActive].scrollIntoView({ block: "nearest" });
+}
+
+function pickSearchResult(slug, version) {
+  // Region inferred from version; we set the version dropdown to the chosen
+  // game (e.g. "emerald") and the slug to the area. Version dropdown options
+  // are populated for the entry's region so the value is valid.
+  const entry = searchIndex.find((e) => e.slug === slug && e.version === version);
+  if (!entry) return;
+  fillVersions(entry.region);
+  $("version").value = entry.version;
+  $("slug").value = slug;
+  $("searchInput").value = "";
+  $("searchResults").classList.remove("open");
+  searchActive = -1;
+  $("load").click();
+}
+
+$("searchInput").addEventListener("input", (e) => {
+  const results = runSearch(e.target.value);
+  renderSearchResults(results);
+  searchActive = -1;
+});
+
+$("searchInput").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown") { e.preventDefault(); setSearchActive(searchActive + 1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); setSearchActive(searchActive - 1); }
+  else if (e.key === "Enter") {
+    const results = $("searchResults").querySelectorAll(".result");
+    const target = searchActive >= 0 ? results[searchActive] : results[0];
+    if (target) pickSearchResult(target.dataset.slug, target.dataset.version);
+  } else if (e.key === "Escape") {
+    $("searchResults").classList.remove("open");
+  }
+});
+
+$("searchResults").addEventListener("click", (e) => {
+  const r = e.target.closest(".result");
+  if (r) pickSearchResult(r.dataset.slug, r.dataset.version);
+});
+
+document.addEventListener("click", (e) => {
+  if (!$("searchWrap").contains(e.target)) {
+    $("searchResults").classList.remove("open");
+  }
+});
+
+// Bootstrap: load cached index, build if empty.
+if (!loadSearchIndex()) {
+  buildSearchIndex();
+}
+
+fillVersions("sinnoh"); // page default slug is sinnoh-route-201-area
+
+// Hamburger / sidebar toggle.
+$("hamburger").addEventListener("click", () => {
+  $("sidebar").classList.toggle("open");
+});
+
+$("rebuildIndex")?.addEventListener("click", async () => {
+  localStorage.removeItem(SEARCH_INDEX_KEY);
+  await buildSearchIndex();
+});
+
+$("load").addEventListener("click", async () => {
+  await loadEncounters();
+  loadLocationInfo();
+  // BGM: prefer cached pick (fast), else auto-search + pick top candidate.
+  const restored = await tryRestoreBgm();
+  if (!restored) {
+    log("auto-searching BGM...");
+    await searchBgm(); // searchBgm auto-picks the top result
+  }
+});
+$("start").addEventListener("click", startWalk);
+$("stop").addEventListener("click", stopWalk);
+$("searchBgm").addEventListener("click", searchBgm);
+$("changeBgm").addEventListener("click", searchBgm);
+$("playBgm").addEventListener("click", () => {
+  if (!bgmBuffer) { status("No BGM loaded — search first."); return; }
+  ensureAudio();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  startBgm();
+  $("playBgm").disabled = true;
+  $("pauseBgm").disabled = false;
+});
+$("pauseBgm").addEventListener("click", () => {
+  stopBgm();
+  $("playBgm").disabled = false;
+  $("pauseBgm").disabled = true;
+});
+$("bgmVol").addEventListener("input", (e) => {
+  if (bgmGain) bgmGain.gain.value = parseFloat(e.target.value);
+});
+
+</script>
+</body>
+</html>
