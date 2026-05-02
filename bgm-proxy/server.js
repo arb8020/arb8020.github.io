@@ -686,28 +686,40 @@ async function fetchBulbaLocation(title) {
     return filename.startsWith(titleFull + "_") || filename.startsWith(titlePrefix + "_");
   });
 
+  // Per-version layout entries: { version: [{ label, url }, ...] }. Some pages
+  // (Eterna Forest, etc.) have multiple layouts per version — exterior vs
+  // interior, surface vs underwater. The "label" comes from the filename's
+  // middle segment between the page title and the version suffix.
   sectionImgs.forEach((img) => {
-      const src = $(img).attr("src") || "";
-      const filename = (src.split("/").pop() || "").replace(/^\d+px-/, "");
-      // Skip non-layout images (warning icons, banner sprites, etc).
-      if (!/\.png$/i.test(filename)) return;
-      // Skip alt-view images: "underwater", "interior", "back", "alt" etc. We want
-      // the canonical surface layout per version. Bulbapedia commonly inserts
-      // these as separate columns/rows alongside the main layout.
-      if (/_(underwater|interior|inside|back|alt|night|cave|sky)_/i.test(filename)) return;
-      // Match suffix: "<basename>_<SUFFIX>.png" — single-char codes like "_E.png"
-      // (Emerald), "_C.png" (Crystal), "_Y.png" (Yellow) must be allowed.
-      const m = filename.match(/_([A-Z][A-Za-z0-9]*)\.png$/);
-      if (!m) return;
-      const suffix = m[1];
-      const found = SUFFIX_TO_VERSIONS.find(([s]) => s === suffix);
-      if (!found) return;
-      const full = stripThumb(src.startsWith("//") ? "https:" + src : src);
-      for (const v of found[1]) {
-        // First image wins — usually the surface/main view appears before underwater/alt views.
-        if (!result.layouts[v]) result.layouts[v] = full;
+    const src = $(img).attr("src") || "";
+    const filename = (src.split("/").pop() || "").replace(/^\d+px-/, "");
+    if (!/\.png$/i.test(filename)) return;
+    const m = filename.match(/_([A-Z][A-Za-z0-9]*)\.png$/);
+    if (!m) return;
+    const suffix = m[1];
+    const found = SUFFIX_TO_VERSIONS.find(([s]) => s === suffix);
+    if (!found) return;
+    // Compute label: filename minus title prefix and version suffix.
+    // "Eterna_Forest_Exterior_DP.png" - "Eterna_Forest_" - "_DP.png" = "Exterior".
+    // Plain "Eterna_Forest_DP.png" -> "main".
+    const baseNoSuffix = filename.replace(/_[A-Z][A-Za-z0-9]*\.png$/, "");
+    let label = "main";
+    if (baseNoSuffix.startsWith(titleFull + "_")) {
+      label = baseNoSuffix.slice(titleFull.length + 1).replace(/_/g, " ") || "main";
+    } else if (baseNoSuffix.startsWith(titlePrefix + "_")) {
+      label = baseNoSuffix.slice(titlePrefix.length + 1).replace(/_/g, " ") || "main";
+    } else if (baseNoSuffix === titleFull || baseNoSuffix === titlePrefix) {
+      label = "main";
+    }
+    const full = stripThumb(src.startsWith("//") ? "https:" + src : src);
+    for (const v of found[1]) {
+      if (!result.layouts[v]) result.layouts[v] = [];
+      // Dedupe by URL.
+      if (!result.layouts[v].some((e) => e.url === full)) {
+        result.layouts[v].push({ label, url: full });
       }
-    });
+    }
+  });
 
   await cacheSet(cacheKey, result);
   return result;
@@ -717,6 +729,201 @@ async function fetchBulbaLocation(title) {
 function bulbaTitleToPokeapiSlug(title) {
   return title.toLowerCase().replace(/_/g, "-") + "-area";
 }
+
+// --- Serebii pokearth fallback ---
+//
+// Serebii hosts per-location pages with cleanly-named map and layout images:
+//   https://www.serebii.net/pokearth/<region>/<gen-subdir>/<slug>.shtml
+// where <slug> is the location name lowercased and concatenated. The page's
+// images live under /pokearth/maps/<region>-<vercode>/<id>[-<floor>].png so
+// we can extract them by inspecting <img> srcs.
+//
+// We map our (region, version) tuple to a Serebii (regionPath, vercode) tuple.
+// Older gens live in <region>/<gen>/ subdirs (e.g. sinnoh/4th/ for DPP),
+// newest entry per region lives unprefixed.
+const SEREBII_PATHS = {
+  // version -> { regionPath, vercode (used for the maps subdir filter) }
+  diamond:        { regionPath: "sinnoh/4th", vercode: "dp" },
+  pearl:          { regionPath: "sinnoh/4th", vercode: "dp" },
+  platinum:       { regionPath: "sinnoh/4th", vercode: "pt" },
+  "brilliant-diamond": { regionPath: "sinnoh", vercode: "bdsp" },
+  "shining-pearl":     { regionPath: "sinnoh", vercode: "bdsp" },
+
+  ruby:     { regionPath: "hoenn/3rd", vercode: "rs" },
+  sapphire: { regionPath: "hoenn/3rd", vercode: "rs" },
+  emerald:  { regionPath: "hoenn/3rd", vercode: "e"  },
+  "omega-ruby":     { regionPath: "hoenn", vercode: "oras" },
+  "alpha-sapphire": { regionPath: "hoenn", vercode: "oras" },
+
+  red:    { regionPath: "kanto/1st", vercode: "rb" },
+  blue:   { regionPath: "kanto/1st", vercode: "rb" },
+  yellow: { regionPath: "kanto/1st", vercode: "y"  },
+  firered:   { regionPath: "kanto/3rd", vercode: "frlg" },
+  leafgreen: { regionPath: "kanto/3rd", vercode: "frlg" },
+
+  gold:    { regionPath: "johto/2nd", vercode: "gs" },
+  silver:  { regionPath: "johto/2nd", vercode: "gs" },
+  crystal: { regionPath: "johto/2nd", vercode: "c" },
+  heartgold:  { regionPath: "johto/4th", vercode: "hgss" },
+  soulsilver: { regionPath: "johto/4th", vercode: "hgss" },
+
+  black:    { regionPath: "unova/5th", vercode: "bw" },
+  white:    { regionPath: "unova/5th", vercode: "bw" },
+  "black-2": { regionPath: "unova/5th", vercode: "b2w2" },
+  "white-2": { regionPath: "unova/5th", vercode: "b2w2" },
+
+  x: { regionPath: "kalos", vercode: "xy" },
+  y: { regionPath: "kalos", vercode: "xy" },
+};
+
+// Slug → Serebii location name. PokéAPI's "wayward-cave-area" → "waywardcave".
+function slugToSerebiiName(slug) {
+  // Drop region prefix and -area suffix, then lowercase + concatenate.
+  let s = slug.replace(/-area$/, "");
+  s = s.replace(/^(sinnoh|hoenn|kanto|johto|unova|kalos|alola|galar|paldea|hisui)-/, "");
+  return s.replace(/-/g, "").toLowerCase();
+}
+
+// Heuristic reverse-mapping: Serebii's lowercase-concatenated slug ("oreburghgate")
+// → our hyphenated form ("oreburgh-gate-area"). Routes: "route201" → "<region>-route-201-area".
+// Other locations: insert hyphens at known word boundaries; not perfect, but
+// good enough for the page to attempt. The page-side code can fall back to its
+// search index if a connection's slug doesn't resolve.
+function serebiiNameToSlug(serebiiName, regionSlug) {
+  const lc = serebiiName.toLowerCase();
+  // Routes: "route123" → "<region>-route-123-area"
+  const routeM = lc.match(/^route(\d+)$/);
+  if (routeM) return `${regionSlug}-route-${routeM[1]}-area`;
+  // Word-boundary hyphenation for common words.
+  const WORDS = ["city","town","gate","cave","forest","lake","tower","mountain","mt","route",
+                 "tunnel","mine","road","park","plaza","valley","temple","ruins","bridge",
+                 "island","beach","resort","hotel","stadium","gym","center","building","house"];
+  let s = lc;
+  for (const w of WORDS) {
+    s = s.replace(new RegExp(`(.)${w}(.|$)`, "g"), (_m, before, after) => `${before}-${w}${after === "" ? "" : after}`);
+    s = s.replace(new RegExp(`^${w}(.+)`, ""), (_m, after) => `${w}-${after}`);
+  }
+  return `${s}-area`;
+}
+
+async function fetchSerebiiLocation(slug, version) {
+  const cacheKey = `serebii:${slug}:${version}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) return cached;
+
+  const path = SEREBII_PATHS[version];
+  if (!path) {
+    return { error: `no Serebii path mapping for version "${version}"` };
+  }
+  const name = slugToSerebiiName(slug);
+  const url = `https://www.serebii.net/pokearth/${path.regionPath}/${name}.shtml`;
+  let html;
+  try {
+    html = await fetchHtml(url);
+  } catch (e) {
+    const result = { error: e.message, url };
+    await cacheSet(cacheKey, result);
+    return result;
+  }
+  const $ = cheerio.load(html);
+
+  // Find images under /pokearth/maps/<region>-<vercode>/...
+  const result = { url, mapImageUrl: null, layouts: {} };
+  // Region-from-version-path: turn "sinnoh/4th" into "sinnoh".
+  const regionSlug = path.regionPath.split("/")[0];
+  const wantPrefix = `/pokearth/maps/${regionSlug}-${path.vercode}/`;
+  const layoutImgs = [];
+  $("img").each((_, el) => {
+    const src = $(el).attr("src") || "";
+    if (!src.startsWith(wantPrefix)) return;
+    layoutImgs.push(src);
+  });
+  if (layoutImgs.length === 0) {
+    // Some pages only have the older-gen maps; if we requested newer-gen and
+    // got nothing, scan for any /pokearth/maps/... image as a soft fallback.
+    $("img").each((_, el) => {
+      const src = $(el).attr("src") || "";
+      if (src.includes("/pokearth/maps/")) layoutImgs.push(src);
+    });
+  }
+  if (layoutImgs.length === 0) {
+    result.error = "no map images on page";
+    await cacheSet(cacheKey, result);
+    return result;
+  }
+  // First image is conventionally the regional locator map (e.g. "35.png");
+  // subsequent ones are layouts (e.g. "35-1f.png", "35-b1f.png").
+  const baseRe = /\/(\d+)(?:-([a-z0-9]+))?\.png$/i;
+  const layouts = [];
+  let regionMap = null;
+  for (const src of layoutImgs) {
+    const m = src.match(baseRe);
+    if (!m) continue;
+    const floor = m[2] || null;
+    const fullUrl = "https://www.serebii.net" + src;
+    if (!floor && !regionMap) {
+      regionMap = fullUrl;
+    } else {
+      layouts.push({ label: floor || "main", url: fullUrl });
+    }
+  }
+  result.mapImageUrl = regionMap || (layouts[0] && layouts[0].url) || null;
+  if (layouts.length > 0) {
+    // Dedupe by URL — Serebii repeats the same image across DP/Pt columns.
+    const seen = new Set();
+    result.layouts[version] = layouts.filter((l) => {
+      if (seen.has(l.url)) return false;
+      seen.add(l.url);
+      return true;
+    });
+  }
+
+  // Connections: Serebii formats them as "<b>North Exit</b>: <a href="x.shtml">X</a>"
+  // followed by <br/>. Parse each <b> whose text ends in "Exit" and grab its
+  // sibling anchor + direction word.
+  result.connections = [];
+  const seenConn = new Set();
+  $("b").each((_, b) => {
+    const text = $(b).text().trim();
+    const m = text.match(/^(North|South|East|West)\s+Exit$/i);
+    if (!m) return;
+    const dir = m[1].toLowerCase();
+    // The anchor is the next <a> sibling in the same parent; cheerio's .next()
+    // skips text nodes, so walk forward looking for an <a>.
+    let n = b.nextSibling;
+    while (n && !(n.type === "tag" && n.name === "a")) n = n.nextSibling;
+    if (!n) return;
+    const $a = $(n);
+    const href = $a.attr("href");
+    const name = $a.text().trim();
+    if (!href || !name) return;
+    // href like "oreburghcity.shtml" — strip extension.
+    const serebiiName = href.replace(/\.shtml$/i, "").replace(/^\.\//, "");
+    const derivedSlug = serebiiNameToSlug(serebiiName, regionSlug);
+    if (seenConn.has(derivedSlug)) return;
+    seenConn.add(derivedSlug);
+    result.connections.push({
+      direction: dir,
+      name,
+      serebiiName,
+      slug: derivedSlug,
+    });
+  });
+  await cacheSet(cacheKey, result);
+  return result;
+}
+
+app.get("/location/info/serebii", async (req, res) => {
+  try {
+    const slug = String(req.query.slug || "").trim();
+    const version = String(req.query.version || "").trim();
+    if (!slug || !version) return res.status(400).json({ error: "slug and version required" });
+    const data = await fetchSerebiiLocation(slug, version);
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.get("/location/info", async (req, res) => {
   try {

@@ -15,7 +15,9 @@
     --muted: #6b6353;
     --hl: #f0e6c8;
   }
-  html, body { background: var(--paper); }
+  html { background: var(--paper); }
+  body { background: var(--paper); }
+  html.immersive { background: transparent; }
   body {
     font-family: "Iowan Old Style", "Charter", "Georgia", serif;
     font-size: 17px; line-height: 1.45;
@@ -27,7 +29,8 @@
   #hamburger {
     position: fixed; top: 1.2em; right: 1.4em;
     width: 36px; height: 36px;
-    background: var(--paper); border: 1px solid var(--ink); border-radius: 4px;
+    background: rgba(246, 241, 227, 0.85); backdrop-filter: blur(6px);
+    border: 1px solid var(--rule); border-radius: 4px;
     cursor: pointer; z-index: 100;
     display: flex; align-items: center; justify-content: center;
     flex-direction: column; gap: 4px;
@@ -90,6 +93,288 @@
     font-variant: small-caps; letter-spacing: 0.04em;
   }
   #searchResults .result .area { color: var(--muted); font-size: 0.85em; }
+
+  /* --- Immersive mode --- */
+  body.immersive {
+    max-width: none; margin: 0; padding: 0;
+    overflow: hidden; height: 100vh;
+    background: transparent;
+  }
+  body.immersive #routeTitle, body.immersive #routeSub,
+  body.immersive #searchWrap:not(.focus),
+  body.immersive > .panel,
+  body.immersive > section.panel,
+  body.immersive > .row-flex,
+  body.immersive > #status {
+    display: none !important;
+  }
+
+  /* The layout image becomes the page background. Z-index 0 sits above the
+     html/body paint but below all positioned UI (which uses z-index >= 2).
+     background-size: auto so big images keep their natural size and pan;
+     when smaller than the viewport, the explicit cover fallback (set in JS
+     based on image dims) ensures no empty borders. */
+  #immersiveBg {
+    position: fixed; inset: 0; z-index: 0;
+    background-size: auto; background-repeat: no-repeat;
+    background-color: var(--paper);
+    image-rendering: pixelated;
+    display: none;
+  }
+  body.immersive #immersiveBg { display: block; }
+  body.immersive #immersiveBg::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.25) 100%);
+    pointer-events: none;
+  }
+
+  /* Sprite stage in immersive mode: full viewport so sprites can be positioned
+     in image-space coords and follow the pan. The sprite's *position* lives
+     on a wrapping <div class="sprite-pos">; the inner <div class="sprite">
+     runs the entry animation. Splitting them avoids the keyframe transform
+     overwriting the position translate. */
+  body.immersive #stage {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 2;
+    background: none; border: none;
+    height: auto;
+  }
+  body.immersive .sprite-pos {
+    position: absolute; top: 0; left: 0;
+    transform: translate(var(--sx, 0), var(--sy, 0));
+    pointer-events: auto;
+  }
+  body.immersive .sprite-pos .sprite {
+    position: static;
+    bottom: auto;
+  }
+
+  /* Edge-zones for hover-to-reveal connection arrows. */
+  .edge-zone {
+    position: fixed; z-index: 5; pointer-events: auto;
+  }
+  .edge-zone.west  { top: 20%; bottom: 20%; left: 0;   width: 80px; }
+  .edge-zone.east  { top: 20%; bottom: 20%; right: 0;  width: 80px; }
+  .edge-zone.north { left: 20%; right: 20%; top: 0;    height: 80px; }
+  .edge-zone.south { left: 20%; right: 20%; bottom: 0; height: 80px; }
+  .edge-zone .conns {
+    position: absolute; display: flex; gap: 0.5em; opacity: 0;
+    transition: opacity 0.2s; pointer-events: auto;
+  }
+  .edge-zone:hover .conns { opacity: 1; }
+  .edge-zone.west .conns  { left: 0.6em; top: 50%; transform: translateY(-50%); flex-direction: column; }
+  .edge-zone.east .conns  { right: 0.6em; top: 50%; transform: translateY(-50%); flex-direction: column; align-items: flex-end; }
+  .edge-zone.north .conns { top: 0.6em; left: 50%; transform: translateX(-50%); }
+  .edge-zone.south .conns { bottom: 0.6em; left: 50%; transform: translateX(-50%); }
+  .edge-conn {
+    background: rgba(246, 241, 227, 0.92); backdrop-filter: blur(6px);
+    border: 1px solid var(--ink); border-radius: 4px;
+    padding: 0.4em 0.8em; font-size: 0.92em; color: var(--ink);
+    cursor: pointer; white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  .edge-conn:hover { background: var(--hl); }
+
+  /* Immersive search bar: shown only when focused (via "/"). */
+  body.immersive #searchWrap {
+    position: fixed; top: 1.4em; left: 50%; transform: translateX(-50%);
+    width: min(560px, 80vw); margin: 0; z-index: 20;
+    display: none;
+  }
+  body.immersive #searchWrap.focus { display: block; }
+  body.immersive #searchInput {
+    background: rgba(246, 241, 227, 0.92); backdrop-filter: blur(8px);
+    border: 1px solid var(--ink); box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+
+  /* Map button (top-left) + popover. */
+  #mapBtn {
+    position: fixed; top: 1.2em; left: 1.4em; z-index: 50;
+    width: 36px; height: 36px;
+    background: rgba(246, 241, 227, 0.85); backdrop-filter: blur(6px);
+    border: 1px solid var(--rule); border-radius: 4px;
+    cursor: pointer; display: none;
+    align-items: center; justify-content: center;
+    font-size: 1.2em;
+  }
+  body.immersive #mapBtn { display: flex; }
+
+  /* Minimap: shows up briefly while panning. The outer box's dimensions
+     track the layout image's aspect ratio (capped at MAX), so a wide route
+     gives a wide minimap and a tall dungeon gives a tall one. */
+  #minimap {
+    position: fixed; top: 1.2em; left: 5em; z-index: 50;
+    background: transparent;
+    border: 1px solid rgba(42, 38, 32, 0.5);
+    border-radius: 4px;
+    padding: 4px;
+    pointer-events: none;
+    opacity: 0; transition: opacity 0.3s;
+    display: none;
+  }
+  body.immersive #minimap { display: block; }
+  #minimap.show { opacity: 1; }
+  #minimapInner {
+    position: relative; width: 100%; height: 100%;
+    background: transparent;
+    border-radius: 2px;
+  }
+  #minimapView {
+    position: absolute;
+    border: 1.5px solid var(--accent-warn);
+    border-radius: 1px;
+  }
+  .minimap-sprite {
+    position: absolute;
+    width: 4px; height: 4px;
+    background: var(--accent);
+    border: 1px solid var(--accent-deep);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  /* Music player (bottom-right). Collapsed: ♪ icon + truncated track title.
+     Expanded: prev/play/next/scrub. Visible in both modes. */
+  #player {
+    position: fixed; bottom: 1.2em; right: 1.4em; z-index: 50;
+    background: rgba(246, 241, 227, 0.85); backdrop-filter: blur(10px);
+    border: 1px solid var(--rule); border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    display: flex; align-items: center;
+    padding: 0.35em 0.7em;
+    font-size: 0.88em;
+    cursor: pointer;
+    max-width: 260px;
+    transition: max-width 0.2s, border-radius 0.2s;
+    user-select: none;
+  }
+  #player .player-icon {
+    font-size: 1.1em; margin-right: 0.5em; line-height: 1;
+  }
+  #player .player-title {
+    flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #player .player-controls { display: none; }
+  #player.expanded {
+    max-width: 380px;
+    border-radius: 8px;
+    flex-direction: column; align-items: stretch;
+    padding: 0.5em 0.8em;
+  }
+  #player.expanded .player-row { display: flex; align-items: center; gap: 0.5em; }
+  #player.expanded .player-controls {
+    display: flex; gap: 0.3em; align-items: center;
+    margin-top: 0.4em;
+  }
+  #player .player-btn {
+    background: transparent; border: none; cursor: pointer;
+    padding: 0.15em 0.45em; font-size: 1em; color: var(--ink);
+    font-family: inherit;
+  }
+  #player .player-btn:hover { background: var(--hl); border-radius: 3px; }
+  #player .player-scrub {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 3px; background: var(--rule); border-radius: 2px;
+    margin: 0 0.4em;
+  }
+  #player .player-scrub::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--accent); cursor: pointer;
+  }
+  #player .player-time {
+    font-family: "SF Mono", Menlo, monospace; font-size: 0.78em;
+    color: var(--muted); min-width: 70px; text-align: right;
+  }
+  #player .player-candidates {
+    max-height: 200px; overflow-y: auto;
+    margin-top: 0.5em; border-top: 1px solid var(--rule-soft);
+    padding-top: 0.4em; display: none;
+  }
+  #player.show-candidates .player-candidates { display: block; }
+  #player .player-candidate {
+    padding: 0.25em 0.5em; cursor: pointer;
+    font-size: 0.85em;
+    border-radius: 3px;
+  }
+  #player .player-candidate:hover { background: var(--hl); }
+  #player .player-candidate.active { background: var(--accent); color: #fffaf0; }
+
+  /* Encounter widget (bottom-left). Mirror of the map button: small toggle,
+     click to expand the panel. */
+  #encBtn {
+    position: fixed; bottom: 1.2em; left: 1.4em; z-index: 50;
+    width: 36px; height: 36px;
+    background: rgba(246, 241, 227, 0.85); backdrop-filter: blur(6px);
+    border: 1px solid var(--rule); border-radius: 4px;
+    cursor: pointer; display: none;
+    align-items: center; justify-content: center;
+    font-size: 1.05em;
+  }
+  body.immersive #encBtn { display: flex; }
+  #encPanel {
+    position: fixed; bottom: 4em; left: 1.4em; z-index: 49;
+    width: 320px; max-height: 70vh; overflow-y: auto;
+    background: rgba(246, 241, 227, 0.85); backdrop-filter: blur(10px);
+    border: 1px solid var(--rule); border-radius: 4px;
+    padding: 0.8em 0.9em;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    display: none;
+  }
+  #encPanel.open { display: block; }
+  #encPanel .method-pills { display: flex; flex-wrap: wrap; gap: 0.3em; margin-bottom: 0.5em; }
+  #encPanel .method-pill {
+    padding: 0.15em 0.55em; font-size: 0.78em;
+    background: var(--paper); border: 1px solid var(--rule);
+    border-radius: 999px; cursor: pointer;
+    font-family: inherit; color: var(--ink);
+  }
+  #encPanel .method-pill.active {
+    background: var(--accent); color: #fffaf0; border-color: var(--accent-deep);
+  }
+  #encPanel .method-pill:hover { background: var(--hl); }
+  #encPanel .method-pill.active:hover { background: var(--accent-deep); }
+  #encPanel select {
+    margin-bottom: 0.5em;
+  }
+  #encPanel .enc-row {
+    display: flex; align-items: center; gap: 0.5em;
+    padding: 0.2em 0; border-bottom: 1px solid var(--rule-soft);
+    font-size: 0.88em;
+  }
+  #encPanel .enc-row:last-child { border-bottom: none; }
+  #encPanel .enc-row img {
+    width: 32px; height: 32px; object-fit: contain;
+    image-rendering: pixelated;
+  }
+  #encPanel .enc-row .name { flex: 1; font-variant: small-caps; letter-spacing: 0.04em; }
+  #encPanel .enc-row .pct { font-family: "SF Mono", Menlo, monospace; font-size: 0.82em; color: var(--muted); }
+  #encPanel .enc-section { font-size: 0.74em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0.6em 0 0.3em 0; }
+  #mapPopover {
+    position: fixed; top: 4em; left: 1.4em; z-index: 49;
+    width: 320px; max-height: 70vh; overflow-y: auto;
+    background: rgba(246, 241, 227, 0.85); backdrop-filter: blur(10px);
+    border: 1px solid var(--rule); border-radius: 4px;
+    padding: 1em; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    display: none;
+  }
+  #mapPopover.open { display: block; }
+  #mapPopover img { display: block; max-width: 100%; height: auto; image-rendering: pixelated; }
+  #mapPopover .conn-list { display: flex; flex-wrap: wrap; gap: 0.4em; margin-top: 0.6em; }
+
+  /* Route caption (bottom-center) — minimal "you are here" indicator. */
+  #immersiveCaption {
+    position: fixed; bottom: 1em; left: 50%; transform: translateX(-50%);
+    z-index: 4; padding: 0.4em 1em; font-size: 0.95em;
+    background: rgba(246, 241, 227, 0.85); backdrop-filter: blur(6px);
+    border: 1px solid var(--rule); border-radius: 4px;
+    font-variant: small-caps; letter-spacing: 0.06em;
+    display: none;
+  }
+  body.immersive #immersiveCaption { display: block; }
+
+  /* Mode toggle button (in sidebar). */
+  #modeToggle { width: 100%; margin-top: 0.6em; }
 
   /* BGM resolution trace */
   .trace { background: #efe7d0; border: 1px solid var(--rule-soft); border-radius: 3px; padding: 0.5em 0.7em; }
@@ -199,9 +484,14 @@
     image-rendering: pixelated;
     image-rendering: -moz-crisp-edges;
     width: 96px; height: 96px;
-    animation: sprite-life 4.2s ease-out forwards;
-    pointer-events: none;
+    animation: sprite-entry 1.4s ease-out forwards;
+    pointer-events: auto;
+    cursor: default;
+    transition: opacity 0.4s;
   }
+  .sprite.fading { opacity: 0; }
+  /* Replay the entry animation when the user hovers a settled sprite. */
+  .sprite:hover { animation: sprite-entry 1.4s ease-out forwards; }
   .sprite img { width: 100%; height: 100%; object-fit: contain; }
   .sprite .sprite-label {
     position: absolute; bottom: -6px; left: 50%;
@@ -211,16 +501,19 @@
     background: var(--paper); padding: 0 0.3em;
     white-space: nowrap;
   }
-  @keyframes sprite-life {
+  /* Entry animation: pop in, bounce twice, settle. fill-mode: forwards keeps
+     the sprite at its final state instead of fading out. The sprite is
+     removed by JS after a timeout (or replayed on hover). */
+  @keyframes sprite-entry {
     0%   { opacity: 0; transform: translateY(20px) scale(0.85); }
-    10%  { opacity: 1; transform: translateY(0) scale(1.05); }
-    18%  { transform: translateY(-6px) scale(1); }
-    26%  { transform: translateY(0) scale(1); }
-    34%  { transform: translateY(-3px) scale(1); }
-    42%  { transform: translateY(0) scale(1); }
-    80%  { opacity: 1; transform: translateY(0) scale(1); }
-    100% { opacity: 0; transform: translateY(-12px) scale(0.95); }
+    20%  { opacity: 1; transform: translateY(0) scale(1.05); }
+    36%  { transform: translateY(-6px) scale(1); }
+    52%  { transform: translateY(0) scale(1); }
+    68%  { transform: translateY(-3px) scale(1); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
   }
+  /* Old name preserved for the field-guide-mode CSS that still uses it. */
+  @keyframes sprite-life { 0% { opacity: 0; } 100% { opacity: 1; } }
 
   /* Bulbapedia connections / location map */
   #connections { display: flex; gap: 0.5em; flex-wrap: wrap; margin: 0.4em 0; }
@@ -229,6 +522,26 @@
   #locationMap, #regionMap { display: block; width: 432px; max-width: 100%; height: auto; image-rendering: pixelated; }
   #layoutImg { display: block; max-width: 100%; height: auto; image-rendering: pixelated; margin-top: 0.6em; }
   #layoutCaption { color: var(--muted); font-style: italic; font-size: 0.85em; margin-top: 0.2em; }
+  .layout-variants { display: inline-flex; gap: 0.3em; margin-left: 0.6em; vertical-align: middle; }
+  .layout-variant {
+    padding: 0.15em 0.55em; font-size: 0.78em;
+    background: var(--paper); border: 1px solid var(--rule);
+    border-radius: 999px; cursor: pointer;
+    font-family: inherit; color: var(--ink);
+    text-transform: lowercase; font-style: normal;
+    letter-spacing: 0.04em;
+  }
+  .layout-variant:hover { background: var(--hl); }
+  .layout-variant.active { background: var(--accent); color: #fffaf0; border-color: var(--accent-deep); }
+  /* In immersive mode, position the caption + variant pills floating above
+     the bottom-center caption strip so the variant picker is reachable. */
+  body.immersive #layoutCaption {
+    position: fixed; bottom: 3.6em; left: 50%; transform: translateX(-50%);
+    z-index: 4; background: rgba(246, 241, 227, 0.85); backdrop-filter: blur(6px);
+    padding: 0.4em 0.9em; border: 1px solid var(--rule); border-radius: 4px;
+    margin: 0; color: var(--ink); font-style: normal;
+    display: block !important;
+  }
   #locationOverlay, #regionOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   #regionOverlay rect { pointer-events: auto; cursor: pointer; fill: rgba(90,122,61,0); stroke: rgba(90,122,61,0.4); stroke-width: 1; transition: fill 0.12s, stroke 0.12s; }
   #regionOverlay rect:hover { fill: rgba(90,122,61,0.4); stroke: rgba(90,122,61,0.9); }
@@ -240,9 +553,46 @@
 </head>
 <body>
 
+<div id="immersiveBg"></div>
+
 <button id="hamburger" aria-label="Toggle controls">
   <span></span><span></span><span></span>
 </button>
+
+<button id="mapBtn" aria-label="Toggle map" title="Map (m)">⌖</button>
+<div id="mapPopover">
+  <div id="mapPopoverInner"></div>
+</div>
+<div id="minimap"><div id="minimapInner"><div id="minimapView"></div></div></div>
+
+<button id="encBtn" aria-label="Toggle encounter widget" title="Encounters (e)">⊞</button>
+<div id="encPanel">
+  <div id="encPanelInner"></div>
+</div>
+
+<div id="player" class="expanded" style="display:none;">
+  <div class="player-row">
+    <span class="player-icon">♪</span>
+    <span class="player-title">no track</span>
+  </div>
+  <div class="player-controls">
+    <button class="player-btn" id="playerPrev" title="previous candidate">⏮</button>
+    <button class="player-btn" id="playerToggle" title="play/pause">⏸</button>
+    <button class="player-btn" id="playerNext" title="next candidate">⏭</button>
+    <input type="range" class="player-scrub" id="playerScrub" min="0" max="100" value="0">
+    <span class="player-time" id="playerTime">0:00 / 0:00</span>
+    <button class="player-btn" id="playerPickerToggle" title="pick from candidates">▾</button>
+  </div>
+  <div class="player-candidates" id="playerCandidates"></div>
+</div>
+
+<div id="immersiveCaption"></div>
+
+<!-- Edge zones for hover-to-reveal connection arrows. Populated dynamically. -->
+<div class="edge-zone west"  id="edgeWest"  style="display:none;"><div class="conns"></div></div>
+<div class="edge-zone east"  id="edgeEast"  style="display:none;"><div class="conns"></div></div>
+<div class="edge-zone north" id="edgeNorth" style="display:none;"><div class="conns"></div></div>
+<div class="edge-zone south" id="edgeSouth" style="display:none;"><div class="conns"></div></div>
 
 <h1 id="routeTitle">Pokémon Soundscape</h1>
 <p class="sub" id="routeSub">A walk through the tall grass.</p>
@@ -253,14 +603,9 @@
   <div id="searchResults"></div>
 </div>
 
-<!-- Layer 1: walk controls -->
-<div class="row-flex" style="margin-bottom:1em;">
-  <button id="start" class="primary" disabled>Start walking</button>
-  <button id="stop" class="stop" disabled>Stop</button>
-  <button id="playBgm">Play music only</button>
-  <button id="pauseBgm" disabled>Pause music</button>
-  <span id="bgmStatus" style="flex:1;font-family:'SF Mono',Menlo,monospace;font-size:0.85em;color:var(--muted);">no track loaded</span>
-</div>
+<!-- Walk controls live in the sidebar; in field-guide mode the sidebar is open
+     by default-ish via the hamburger. Status text always shows in the caption / sidebar. -->
+<span id="bgmStatus" style="display:none">no track loaded</span>
 
 <!-- Layer 1: layout image (the artwork) -->
 <section class="panel" id="layoutPanel" style="display:none;border-top:none;padding-top:0;margin-top:0;">
@@ -286,22 +631,26 @@
 
 <!-- Sidebar: layer 2 / 3 controls -->
 <aside id="sidebar">
-  <h3>Encounter table</h3>
-  <div id="encounters"><em style="color:var(--muted)">none loaded</em></div>
+  <!-- Hidden Start/Stop kept so legacy event handlers don't crash. Walking
+       starts automatically once audio is unlocked; the music player's
+       play/pause is the only surface control needed. -->
+  <button id="start" class="primary" style="display:none" disabled>Start</button>
+  <button id="stop" class="stop" style="display:none" disabled>Stop</button>
+  <div id="bgmStatusSidebar" style="margin-top:0.5em;font-family:'SF Mono',Menlo,monospace;font-size:0.85em;color:var(--muted);">no track loaded</div>
+  <button id="modeToggle">Switch to immersive mode</button>
 
-  <h3>Background music</h3>
-  <div class="row-flex">
+  <h3>BGM resolution</h3>
+  <div id="bgmTrace" style="font-size:0.85em;"></div>
+  <div id="bgmPicker" style="margin-top:0.6em;"></div>
+
+  <!-- Hidden canonical inputs. Visible UI elsewhere on the page mirrors these. -->
+  <div style="display:none">
+    <!-- Sink element used by renderTable; the visible encounter table lives in
+         the bottom-left widget. -->
+    <div id="encounters"></div>
     <button id="searchBgm">Search</button>
     <button id="changeBgm" disabled>Change pick</button>
-  </div>
-  <div id="bgmTrace" style="margin-top:0.6em;font-size:0.85em;"></div>
-  <div id="bgmPicker" style="margin-top:0.6em;"></div>
-  <label style="margin-top:0.6em;display:block;">Vol
     <input id="bgmVol" type="range" min="0" max="1" step="0.05" value="0.6">
-  </label>
-
-  <h3>Version</h3>
-  <div class="row-flex">
     <select id="version">
       <option value="platinum" selected>Platinum</option>
     </select>
@@ -328,27 +677,13 @@
       <option value="time-night">night</option>
       <option value="any">any</option>
     </select>
+    <input id="stepMean" type="number" min="0.2" step="0.1" value="1.0">
+    <input id="encRate" type="number" min="0.001" max="1" step="0.01" value="0.05">
+    <input id="vol" type="range" min="0" max="1" step="0.05" value="0.35">
+    <input id="wanderOn" type="checkbox" checked>
+    <input id="wanderRate" type="number" min="0" max="1" step="0.001" value="0.5">
+    <span id="wanderStatus"></span>
   </div>
-
-  <h3>Walk parameters</h3>
-  <div class="row-flex">
-    <label>Step (s)
-      <input id="stepMean" type="number" min="0.2" step="0.1" value="1.0">
-    </label>
-    <label>Enc rate
-      <input id="encRate" type="number" min="0.001" max="1" step="0.01" value="0.10">
-    </label>
-    <label>Cry vol
-      <input id="vol" type="range" min="0" max="1" step="0.05" value="0.35">
-    </label>
-  </div>
-  <div class="row-flex" style="margin-top:0.4em;">
-    <label><input id="wanderOn" type="checkbox"> Wander</label>
-    <label>Wander rate
-      <input id="wanderRate" type="number" min="0" max="1" step="0.001" value="0.005">
-    </label>
-  </div>
-  <span id="wanderStatus" style="font-family:'SF Mono',Menlo,monospace;font-size:0.78em;color:var(--muted);"></span>
 
   <details class="advanced">
     <summary>Advanced</summary>
@@ -358,21 +693,33 @@
     <label style="margin-top:0.5em;display:block;">Proxy
       <input id="proxy" type="text" value="http://localhost:8787" size="32">
     </label>
+    <label style="margin-top:0.5em;display:block;">Primary source
+      <select id="primarySource">
+        <option value="bulbapedia" selected>Bulbapedia</option>
+        <option value="serebii">Serebii</option>
+      </select>
+    </label>
+    <label style="margin-top:0.5em;display:block;font-size:0.85em;color:var(--muted);">
+      <input id="fallbackEnabled" type="checkbox" checked>
+      Fall back to the other source if primary is missing data
+    </label>
     <button id="load" style="margin-top:0.6em;">Reload</button>
     <button id="rebuildIndex" style="margin-top:0.6em;">Rebuild search index</button>
+  </details>
+
+  <details class="log-details" style="margin-top:1em;">
+    <summary>log</summary>
+    <div id="log"></div>
   </details>
 </aside>
 
 <div id="status"></div>
-<details class="log-details">
-  <summary>log</summary>
-  <div id="log"></div>
-</details>
 
 <script>
 "use strict";
 
 const POKEAPI = "https://pokeapi.co/api/v2";
+const SPRITE_LIFETIME_MS = 20000;
 
 const $ = (id) => document.getElementById(id);
 const status = (msg) => { $("status").textContent = msg; };
@@ -383,7 +730,33 @@ const log = (msg) => {
 };
 
 // State
-let encounters = []; // [{name, chance, cryUrl}]
+let encounters = []; // [{name, chance, cryUrl}] — combined across selected methods
+let availableMethods = new Map(); // method -> count, derived from the loaded area for current version
+let selectedMethods = new Set(["walk"]); // user-chosen methods to merge
+let lastAreaData = null; // raw PokéAPI location-area JSON, kept so we can re-filter without refetch
+let areaSiblings = []; // [{name, current}] - other areas under the same parent location
+let _immersiveBgDims = null; // { w, h } of current immersive bg image, set on load
+let _audioUnlocked = false;
+// Direction the user just navigated *from*. The next refreshImmersiveBg will
+// position the layout so the user "arrives" from that direction (e.g. came from
+// a west neighbor → start scrolled all the way to the west edge of the new
+// layout, so the eastward path is laid out before them).
+let _arrivalFrom = null; // null | "west" | "east" | "north" | "south"
+// Bytes fetched before the user has gestured; held until ensureAudio() can run.
+let _pendingBgmBytes = null;
+// BGM loop tracking. Wander rolls fire on each loop boundary, not per walk-step.
+let _bgmLastPos = 0;
+let _bgmLoopCount = 0;
+let _isFirstLocationOfSession = true;
+// Music player state.
+let _playerCandidates = []; // last searchBgm result list (for prev/next/picker)
+let _playerCurrent = null;  // currently playing candidate
+let _playerSeekOffset = 0;  // seconds into the buffer at which startBgm was called
+let _playerStartedAt = 0;   // audioCtx.currentTime when current source started
+let _playerInterval = null; // setInterval for time readout
+function oppositeDir(d) {
+  return ({ west: "east", east: "west", north: "south", south: "north" })[d] || null;
+}
 let walking = false;
 let walkTimer = null;
 let audioCtx = null;
@@ -415,62 +788,129 @@ function localTimeBand() {
   return "time-night";
 }
 
+// Given a 404-ing area slug like "sinnoh-route-204-area", look up its parent
+// location's actual areas. PokéAPI splits some routes into multiple areas
+// (e.g., Route 204 = north + south halves) which Bulbapedia papers over.
+// Returns [{name, ...}] or [] if no parent location exists.
+async function findSiblingAreas(slug) {
+  // Strip the trailing "-area"; that's the convention Bulbapedia-derived
+  // slugs use, and PokéAPI's location names are the same minus that suffix.
+  const locName = slug.replace(/-area$/, "");
+  try {
+    const res = await fetch(`${POKEAPI}/location/${locName}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.areas || [];
+  } catch {
+    return [];
+  }
+}
+
 async function loadEncounters() {
-  const slug = $("slug").value.trim();
+  let slug = $("slug").value.trim();
   const version = $("version").value;
-  const method = $("method").value;
   const todChoice = $("tod").value;
   const band = todChoice === "auto" ? localTimeBand()
              : todChoice === "any" ? null
              : todChoice;
-  if (todChoice === "auto") {
-    log(`local time band: ${band}`);
-  }
+  if (todChoice === "auto") log(`local time band: ${band}`);
 
   status(`Fetching ${slug}...`);
 
   let area;
   try {
-    const res = await fetch(`${POKEAPI}/location-area/${slug}`);
+    let res = await fetch(`${POKEAPI}/location-area/${slug}`);
     if (res.status === 404) {
-      // No location-area in PokéAPI — typical for towns / interiors with no wild encounters.
-      // Clear the encounter table but don't wedge the UI; let the location panel still load.
-      encounters = [];
-      $("encounters").innerHTML = `<em style="color:var(--muted)">no wild encounters here (PokéAPI has no location-area for this slug)</em>`;
-      $("start").disabled = true;
-      status(`No wild encounters: ${slug}`);
-      log(`no encounters for ${slug} (404)`);
-      return;
+      // The synthetic slug missed; the parent location may have differently-
+      // named areas (Route 204 = north + south halves). Auto-pick the first
+      // and surface all of them in the encounter widget so the user can swap.
+      const siblings = await findSiblingAreas(slug);
+      if (siblings.length > 0) {
+        log(`${slug} 404; parent has ${siblings.length} area(s): ${siblings.map((a) => a.name).join(", ")}`);
+        slug = siblings[0].name;
+        $("slug").value = slug;
+        areaSiblings = siblings.map((a) => ({ name: a.name }));
+        res = await fetch(`${POKEAPI}/location-area/${slug}`);
+        if (!res.ok) throw new Error(`fallback area HTTP ${res.status}`);
+      } else {
+        encounters = [];
+        lastAreaData = null;
+        availableMethods = new Map();
+        areaSiblings = [];
+        $("encounters").innerHTML = `<em style="color:var(--muted)">no wild encounters here (no PokéAPI areas for this location)</em>`;
+        $("start").disabled = true;
+        status(`No wild encounters: ${slug}`);
+        log(`no encounters for ${slug} (404, no siblings)`);
+        renderEncounterPanel();
+        return;
+      }
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     area = await res.json();
+    // Use the area's declared parent to fetch sibling areas — robust against
+    // any naming convention (north/south, b1f, etc.).
+    if (area.location?.url) {
+      try {
+        const lr = await fetch(area.location.url);
+        if (lr.ok) {
+          const ld = await lr.json();
+          areaSiblings = (ld.areas || []).length > 1
+            ? ld.areas.map((a) => ({ name: a.name }))
+            : [];
+        }
+      } catch {}
+    }
   } catch (e) {
     status(`Failed to load location-area: ${e.message}`);
     log(`load failed: ${e.message}`);
-    // Keep prior encounters; don't disable Start if they were valid.
     return;
   }
+  lastAreaData = area;
   $("start").disabled = true;
 
-  // Filter encounters by version + method + time band.
-  // An encounter_detail matches the band if either:
-  //   (a) we're in "any" mode (band === null), OR
-  //   (b) it has no time condition_values (time-agnostic), OR
-  //   (c) it has a condition_value matching the band.
+  // Compute availableMethods for the chosen version: method -> chance-sum.
+  availableMethods = new Map();
+  for (const enc of area.pokemon_encounters) {
+    const vd = enc.version_details.find((v) => v.version.name === version);
+    if (!vd) continue;
+    for (const ed of vd.encounter_details) {
+      availableMethods.set(ed.method.name, (availableMethods.get(ed.method.name) || 0) + ed.chance);
+    }
+  }
+
+  // If none of the selected methods are available, fall back to whichever
+  // method has the most chance-mass for this route+version.
+  const validSelected = [...selectedMethods].filter((m) => availableMethods.has(m));
+  if (validSelected.length === 0) {
+    if (availableMethods.size === 0) {
+      encounters = [];
+      $("encounters").innerHTML = `<em style="color:var(--muted)">no encounters in ${version} for this area</em>`;
+      $("start").disabled = true;
+      renderEncounterPanel();
+      return;
+    }
+    const top = [...availableMethods.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    selectedMethods = new Set([top]);
+    log(`auto-selected method: ${top} (no user-selected method had data)`);
+    // Mirror into the legacy <select> for the search-bar / wander code paths.
+    $("method").value = top;
+  }
+
+  // Merge encounters across all currently-selected methods. Combined-pool
+  // weighting: each method's chance contributions sum directly, so denser
+  // methods (more entries / higher chances) dominate the combined sample.
   const TIME_VALUES = new Set(["time-morning", "time-day", "time-night"]);
-  const tally = new Map(); // name -> {chance, url}
+  const tally = new Map();
   for (const enc of area.pokemon_encounters) {
     const vd = enc.version_details.find((v) => v.version.name === version);
     if (!vd) continue;
     let chanceSum = 0;
     for (const ed of vd.encounter_details) {
-      if (ed.method.name !== method) continue;
+      if (!selectedMethods.has(ed.method.name)) continue;
       const timeConds = ed.condition_values
         .map((c) => c.name)
         .filter((n) => TIME_VALUES.has(n));
-      const matches = band === null
-        || timeConds.length === 0
-        || timeConds.includes(band);
+      const matches = band === null || timeConds.length === 0 || timeConds.includes(band);
       if (!matches) continue;
       chanceSum += ed.chance;
     }
@@ -485,26 +925,9 @@ async function loadEncounters() {
 
   if (tally.size === 0) {
     encounters = [];
-    // Diagnose: what version/method combinations DO have data on this area?
-    const available = new Map(); // version -> Set(methods)
-    for (const enc of area.pokemon_encounters) {
-      for (const vd of enc.version_details) {
-        const ms = available.get(vd.version.name) || new Set();
-        for (const ed of vd.encounter_details) ms.add(ed.method.name);
-        available.set(vd.version.name, ms);
-      }
-    }
-    let html = `<em style="color:var(--muted)">no encounters for ${version} / ${method}.</em>`;
-    if (available.size > 0) {
-      html += `<div style="margin-top:0.5em;font-size:0.85em;color:var(--muted)">PokéAPI has data for:</div><ul style="margin:0.3em 0 0 1.2em;padding:0;font-size:0.85em;color:var(--muted)">`;
-      for (const [ver, methods] of [...available.entries()].sort()) {
-        html += `<li><b>${ver}</b>: ${[...methods].sort().join(", ")}</li>`;
-      }
-      html += `</ul>`;
-    }
-    status(`No encounters found for ${version} / ${method}.`);
-    $("encounters").innerHTML = html;
+    $("encounters").innerHTML = `<em style="color:var(--muted)">no encounters for ${version} / ${[...selectedMethods].join("+")} (try other methods)</em>`;
     $("start").disabled = true;
+    renderEncounterPanel();
     return;
   }
 
@@ -533,6 +956,7 @@ async function loadEncounters() {
 
   encounters = list.filter((p) => p.cryUrl); // sprite is optional, cry is required
   renderTable();
+  renderEncounterPanel();
   status(`Loaded ${encounters.length} species.`);
   $("start").disabled = false;
 }
@@ -568,14 +992,17 @@ function sampleSpecies() {
 // --- Audio ---
 
 async function playCry(url) {
-  ensureAudio();
+  // Only play cries once audio has been unlocked. Before that, the call
+  // would either no-op (suspended ctx) or worse, get into a bad state.
+  if (!audioCtx || audioCtx.state !== "running") return;
   try {
     const res = await fetch(url);
     const buf = await res.arrayBuffer();
     const decoded = await audioCtx.decodeAudioData(buf);
     const src = audioCtx.createBufferSource();
     const gain = audioCtx.createGain();
-    gain.gain.value = parseFloat($("vol").value);
+    const volEl = $("vol");
+    gain.gain.value = volEl ? parseFloat(volEl.value) : 0.35;
     src.buffer = decoded;
     src.connect(gain).connect(masterGain);
     src.start();
@@ -602,26 +1029,7 @@ function scheduleNextStep() {
       popSprite(sp);
     }
 
-    // Wander roll. Hard floor: BGM must have completed at least one full loop.
-    if ($("wanderOn").checked) {
-      const wRate = parseFloat($("wanderRate").value);
-      const elapsed = audioCtx ? audioCtx.currentTime - bgmStartedAt : 0;
-      const loopsDone = (bgmBuffer && bgmStartedAt > 0) ? elapsed / bgmBuffer.duration : 0;
-      $("wanderStatus").textContent = `loops: ${loopsDone.toFixed(2)}`;
-      if (loopsDone >= 1 && currentConnections.length > 0 && Math.random() < wRate) {
-        const next = currentConnections[Math.floor(Math.random() * currentConnections.length)];
-        log(`wander → ${next.name} (${next.slug})`);
-        // Clear sprites; they belong to the previous location.
-        $("stage").innerHTML = "";
-        // Swap slug and trigger Load. walking stays true so the loop survives.
-        $("slug").value = next.slug;
-        // Don't click the button (re-enters the click handler with our handler);
-        // call the navigation directly.
-        await navigateTo(next.slug);
-        // After navigation, fall through and reschedule the next step on the new location.
-      }
-    }
-
+    // (Wander is no longer rolled per walk-step; see onBgmLoopComplete.)
     scheduleNextStep();
   }, delayMs);
 }
@@ -631,28 +1039,63 @@ async function navigateTo(slug) {
   $("slug").value = slug;
   await loadEncounters();
   loadLocationInfo();
-  const restored = await tryRestoreBgm();
-  if (!restored) await searchBgm();
-  // If we're walking and a new BGM buffer is loaded, ensure it's playing.
+  await searchBgm();
   if (walking && bgmBuffer && !bgmSource) startBgm();
 }
 
 // Sprite pop-up. Appends an element to #stage at a random horizontal position,
 // CSS animation handles entry/bounce/exit, then we remove the node.
+// Sprite spawn. In field-guide mode the sprite is positioned via `left` in
+// stage-local coords. In immersive mode it carries an image-space coordinate
+// (imgX, imgY in the layout's natural pixels) that the pan loop maps to a
+// transform each frame, so sprites stay glued to the artwork as you pan.
 function popSprite(species) {
-  if (!species.spriteUrl) return;
+  if (!species.spriteUrl) {
+    log(`sprite skipped: ${species.name} has no spriteUrl`);
+    return;
+  }
   const stage = $("stage");
-  const sw = stage.clientWidth || 600;
-  const el = document.createElement("div");
-  el.className = "sprite";
-  // Random x within stage, leaving margin for the sprite width.
-  const margin = 60;
-  const x = Math.max(margin, Math.min(sw - margin, margin + Math.random() * (sw - 2 * margin))) - 48;
-  el.style.left = `${x}px`;
-  el.innerHTML = `<img src="${species.spriteUrl}" alt="${species.name}"><span class="sprite-label">${species.name}</span>`;
-  stage.appendChild(el);
-  setTimeout(() => el.remove(), 4400);
+  const immersive = document.body.classList.contains("immersive");
+  log(`sprite ${species.name} immersive=${immersive} dims=${_immersiveBgDims ? "set" : "null"}`);
+  const inner = document.createElement("div");
+  inner.className = "sprite";
+  inner.innerHTML = `<img src="${species.spriteUrl}" alt="${species.name}"><span class="sprite-label">${species.name}</span>`;
+
+  let outer; // The element appended to #stage. In immersive, it's a wrapper
+             // holding the position translate so the entry animation on .sprite
+             // doesn't clobber it.
+  if (immersive && _immersiveBgDims) {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const margin = 80;
+    const vx = margin + Math.random() * Math.max(0, vw - 2 * margin);
+    const vy = vh * 0.55 + Math.random() * (vh * 0.30); // lower 55-85% of viewport
+    const imgX = -_panX + vx;
+    const imgY = -_panY + vy;
+    outer = document.createElement("div");
+    outer.className = "sprite-pos";
+    outer.dataset.imgX = imgX;
+    outer.dataset.imgY = imgY;
+    outer.style.setProperty("--sx", `${vx - 48}px`);
+    outer.style.setProperty("--sy", `${vy - 48}px`);
+    outer.appendChild(inner);
+  } else {
+    // Field-guide: random horizontal in the stage strip; sprite directly.
+    const sw = stage.clientWidth || 600;
+    const margin = 60;
+    const x = Math.max(margin, Math.min(sw - margin, margin + Math.random() * (sw - 2 * margin))) - 48;
+    inner.style.left = `${x}px`;
+    outer = inner;
+  }
+  stage.appendChild(outer);
+  // Flash the minimap so the user sees the dot pulse in (good for diagnosing
+  // "are sprites even spawning?" without panning).
+  if (immersive && _immersiveBgDims) showMinimap();
+  setTimeout(() => {
+    outer.classList.add("fading");
+    setTimeout(() => outer.remove(), 500);
+  }, SPRITE_LIFETIME_MS);
 }
+
 
 function startWalk() {
   if (encounters.length === 0) { status("Load encounters first."); return; }
@@ -665,8 +1108,6 @@ function startWalk() {
   status("Walking...");
   log("started walking");
   startBgm();
-  $("playBgm").disabled = true;
-  $("pauseBgm").disabled = false;
   scheduleNextStep();
 }
 
@@ -677,21 +1118,32 @@ function stopWalk() {
   $("start").disabled = encounters.length === 0;
   $("stop").disabled = true;
   stopBgm();
-  $("playBgm").disabled = !bgmBuffer;
-  $("pauseBgm").disabled = true;
   status("Stopped.");
   log("stopped");
 }
 
-function startBgm() {
+function startBgm(offsetSec) {
   if (!bgmBuffer) return; // no track loaded
   if (bgmSource) return;  // already playing
+  // Audio context must exist *and* be running — the user must have gestured.
+  // Without this check we silently call src.start() on a suspended context,
+  // which Chrome ignores and then logs autoplay-policy noise.
+  if (!audioCtx || audioCtx.state !== "running") return;
+  const offset = (offsetSec != null && Number.isFinite(offsetSec)) ? offsetSec : 0;
   bgmSource = audioCtx.createBufferSource();
   bgmSource.buffer = bgmBuffer;
-  bgmSource.loop = true; // gapless loop via Web Audio
+  bgmSource.loop = true;
   bgmSource.connect(bgmGain);
-  bgmSource.start();
+  bgmSource.start(0, offset);
   bgmStartedAt = audioCtx.currentTime;
+  _playerSeekOffset = offset;
+  _playerStartedAt = audioCtx.currentTime;
+  // New playback session = reset loop tracker. The loop count counts full
+  // wraparounds since this start; offset != 0 means a seek, so we don't
+  // pretend we just started fresh.
+  _bgmLastPos = offset;
+  _bgmLoopCount = 0;
+  $("playerToggle").textContent = "⏸";
 }
 
 function stopBgm() {
@@ -699,14 +1151,20 @@ function stopBgm() {
   try { bgmSource.stop(); } catch {}
   bgmSource.disconnect();
   bgmSource = null;
+  $("playerToggle").textContent = "▶";
 }
 
 // --- BGM (khinsider via proxy) ---
 
-const bgmKey = () => {
-  const tb = effectiveTimeBand() || "any";
-  return `bgm:${$("slug").value.trim()}:${$("version").value}:${tb}`;
-};
+// Content-addressed mp3-url cache: trackTitle -> mp3Url. Keyed only on the
+// album track title (which uniquely identifies a song), so it's immune to slug
+// races and survives across locations that share a theme.
+const MP3_CACHE_KEY = "mp3Cache:v1";
+function loadMp3Cache() {
+  try { return JSON.parse(localStorage.getItem(MP3_CACHE_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveMp3Cache(c) { localStorage.setItem(MP3_CACHE_KEY, JSON.stringify(c)); }
 
 // Resolve the user-effective time band (auto -> map to local tz -> day/morning/night).
 function effectiveTimeBand() {
@@ -756,8 +1214,9 @@ async function searchBgm() {
     </label>
     <button id="bgmPick">Use this track</button>
   `;
-  // Stash candidates for the pick handler.
+  // Stash candidates for the pick handler + the bottom-right player.
   window._bgmCandidates = data.candidates;
+  _playerCandidates = data.candidates;
 
   $("bgmPick").addEventListener("click", () => {
     const idx = parseInt($("bgmSelect").value, 10);
@@ -818,82 +1277,177 @@ function renderBgmTrace(slug, version, timeBand, data) {
   $("bgmTrace").innerHTML = html;
 }
 
+// Fetch + decode an MP3 into bgmBuffer. If audio hasn't been unlocked yet
+// (no user gesture), stash the raw bytes; the gesture handler will decode
+// + start them. This is the Chrome autoplay-policy compliant path: don't
+// touch AudioContext until we're inside a user-gesture event.
 async function loadBgmBuffer(mp3Url) {
-  ensureAudio();
   const proxy = $("proxy").value.trim().replace(/\/$/, "");
-  // Stream through proxy to get CORS for decodeAudioData.
   const streamUrl = `${proxy}/bgm/stream?url=${encodeURIComponent(mp3Url)}`;
   const res = await fetch(streamUrl);
   if (!res.ok) throw new Error(`stream HTTP ${res.status}`);
   const buf = await res.arrayBuffer();
+  if (!audioCtx) {
+    // No audio context yet → user hasn't gestured. Defer the decode.
+    _pendingBgmBytes = { mp3Url, bytes: buf };
+    log(`bgm bytes pending; click or press a key to start`);
+    return;
+  }
   bgmBuffer = await audioCtx.decodeAudioData(buf);
 }
 
 async function pickBgm(candidate) {
   const proxy = $("proxy").value.trim().replace(/\/$/, "");
-  status(`Resolving "${candidate.title}"...`);
-  let data;
-  try {
-    const res = await fetch(`${proxy}/bgm/resolve?trackUrl=${encodeURIComponent(candidate.trackUrl)}`);
-    data = await res.json();
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-  } catch (e) {
-    status(`BGM resolve failed: ${e.message}`);
-    log(`bgm resolve failed: ${e.message}`);
-    return;
+  // Content-addressed cache lookup: have we resolved this exact track before?
+  const cache = loadMp3Cache();
+  let mp3Url = cache[candidate.title];
+  if (mp3Url) {
+    log(`bgm cache hit: ${candidate.title}`);
+  } else {
+    status(`Resolving "${candidate.title}"...`);
+    try {
+      const res = await fetch(`${proxy}/bgm/resolve?trackUrl=${encodeURIComponent(candidate.trackUrl)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      mp3Url = data.mp3Url;
+      cache[candidate.title] = mp3Url;
+      saveMp3Cache(cache);
+    } catch (e) {
+      status(`BGM resolve failed: ${e.message}`);
+      log(`bgm resolve failed: ${e.message}`);
+      return;
+    }
   }
   status(`Decoding "${candidate.title}"...`);
   try {
-    // If BGM is currently playing, stop it before swapping the buffer.
     stopBgm();
-    await loadBgmBuffer(data.mp3Url);
-    // If we were walking, restart BGM with the new buffer.
-    if (walking) startBgm();
+    await loadBgmBuffer(mp3Url);
+    // If audio has been unlocked (user has interacted) OR we're currently
+    // walking, start the new buffer. Otherwise wait for the gesture handler.
+    if (_audioUnlocked || walking) startBgm();
   } catch (e) {
     status(`BGM decode failed: ${e.message}`);
     log(`bgm decode failed: ${e.message}`);
     return;
   }
-  $("bgmStatus").textContent = `▶ ${candidate.title}`;
+  setBgmStatus(`▶ ${candidate.title}`);
   status(`BGM ready: ${candidate.title}`);
   log(`bgm picked: ${candidate.title}`);
-  localStorage.setItem(bgmKey(), JSON.stringify({ candidate, mp3Url: data.mp3Url }));
   $("changeBgm").disabled = false;
-}
-
-async function tryRestoreBgm() {
-  const saved = localStorage.getItem(bgmKey());
-  if (!saved) return false;
-  try {
-    const { candidate, mp3Url } = JSON.parse(saved);
-    stopBgm();
-    await loadBgmBuffer(mp3Url);
-    $("bgmStatus").textContent = `▶ ${candidate.title}`;
-    status(`BGM restored: ${candidate.title}`);
-    log(`bgm restored from cache: ${candidate.title}`);
-    $("changeBgm").disabled = false;
-    if (walking) startBgm();
-    return true;
-  } catch (e) {
-    log(`bgm restore failed: ${e.message}`);
-    return false;
-  }
+  _playerCurrent = candidate;
+  refreshPlayer();
 }
 
 // --- Bulbapedia location info ---
 
+// Cache of image natural dimensions, keyed by URL. Probing each layout image
+// once tells us whose layout is "bigger" so we can pick the more-detailed one
+// when both Bulbapedia and Serebii offer this version.
+const _imgDimsCache = new Map();
+function probeImageDims(url) {
+  if (_imgDimsCache.has(url)) return Promise.resolve(_imgDimsCache.get(url));
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const dims = { w: img.naturalWidth, h: img.naturalHeight };
+      _imgDimsCache.set(url, dims);
+      resolve(dims);
+    };
+    img.onerror = () => {
+      _imgDimsCache.set(url, { w: 0, h: 0 });
+      resolve({ w: 0, h: 0 });
+    };
+    img.src = url;
+  });
+}
+
+// Pick whichever source's layouts are bigger (by total pixel area summed
+// across all variants for the requested version). Either side may be empty.
+async function pickBestLayouts(aLayouts, bLayouts, version, proxy) {
+  const aVar = aLayouts?.[version] || (aLayouts ? Object.values(aLayouts)[0] : null);
+  const bVar = bLayouts?.[version] || (bLayouts ? Object.values(bLayouts)[0] : null);
+  if (!aVar?.length && !bVar?.length) return aLayouts || bLayouts || {};
+  if (!aVar?.length) return bLayouts;
+  if (!bVar?.length) return aLayouts;
+
+  const measure = async (variants) => {
+    let total = 0;
+    for (const v of variants) {
+      const url = `${proxy}/location/image?url=${encodeURIComponent(v.url)}`;
+      const dims = await probeImageDims(url);
+      total += dims.w * dims.h;
+    }
+    return total;
+  };
+  const [aArea, bArea] = await Promise.all([measure(aVar), measure(bVar)]);
+  log(`layouts: a=${aArea}px² b=${bArea}px² → ${aArea >= bArea ? "a" : "b"}`);
+  return aArea >= bArea ? aLayouts : bLayouts;
+}
+
+// Fetch a location's info from one of the two sources. Bulbapedia is the
+// canonical source for connections + music; Serebii's structured /pokearth/
+// pages are the fallback for layouts and maps when Bulbapedia comes up empty.
+async function fetchLocationInfo(source, slug, version, proxy) {
+  const endpoint = source === "serebii" ? "/location/info/serebii" : "/location/info";
+  const res = await fetch(`${proxy}${endpoint}?slug=${encodeURIComponent(slug)}&version=${version}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
 async function loadLocationInfo() {
   const slug = $("slug").value.trim();
+  const version = $("version").value;
   const proxy = $("proxy").value.trim().replace(/\/$/, "");
-  let data;
-  try {
-    const res = await fetch(`${proxy}/location/info?slug=${encodeURIComponent(slug)}`);
-    data = await res.json();
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-  } catch (e) {
-    log(`location info failed: ${e.message}`);
+  const primary = $("primarySource")?.value || "bulbapedia";
+  const secondary = primary === "bulbapedia" ? "serebii" : "bulbapedia";
+  const fallbackOn = $("fallbackEnabled")?.checked ?? true;
+
+  // Fetch primary + secondary in parallel so the merge below is fast. Either
+  // can fail; the merge tolerates partial responses.
+  const [primaryData, secondaryData] = await Promise.all([
+    fetchLocationInfo(primary, slug, version, proxy).catch((e) => {
+      log(`primary (${primary}) failed: ${e.message}`);
+      return null;
+    }),
+    fallbackOn ? fetchLocationInfo(secondary, slug, version, proxy).catch((e) => {
+      log(`secondary (${secondary}) failed: ${e.message}`);
+      return null;
+    }) : Promise.resolve(null),
+  ]);
+
+  if (!primaryData && !secondaryData) {
     $("locationPanel").style.display = "none";
     return;
+  }
+
+  // Merge with field-specific source preferences:
+  // - mapImageUrl: always Bulbapedia (Serebii's regional map is gen-specific
+  //   and doesn't show "where in the region you are" the same way).
+  // - layouts: primary, then secondary if primary has none.
+  // - connections: primary, then secondary if primary has none. Serebii's
+  //   connections are well-tagged with directions, so they're a strong fallback
+  //   for Bulbapedia's prose-based "near" connections.
+  // - music + title: Bulbapedia only (Serebii doesn't structurally expose them).
+  const bulba = primary === "bulbapedia" ? primaryData : secondaryData;
+  const sere  = primary === "serebii"    ? primaryData : secondaryData;
+  // Layout merge: when both sources offer layouts for this version, pick
+  // whichever has the larger natural pixel area. Tendency: Bulbapedia is
+  // bigger for cities (full overworld map), Serebii is bigger for routes
+  // (per-floor gameplay map). Don't hardcode either preference; compare.
+  const layouts = await pickBestLayouts(primaryData?.layouts, secondaryData?.layouts, version, proxy);
+
+  const data = {
+    title: (bulba?.title) || (primaryData?.title) || slug,
+    mapImageUrl: bulba?.mapImageUrl || null,
+    layouts,
+    connections: (primaryData?.connections && primaryData.connections.length > 0)
+      ? primaryData.connections
+      : (secondaryData?.connections || []),
+    music: bulba?.music || [],
+  };
+  if (data.connections !== primaryData?.connections && data.connections.length > 0) {
+    log(`connections filled from ${secondary}`);
   }
 
   $("locationPanel").style.display = "";
@@ -907,6 +1461,7 @@ async function loadLocationInfo() {
     btn.textContent = `${arrowFor(c.direction)} ${c.name}`;
     btn.title = c.slug;
     btn.addEventListener("click", () => {
+      _arrivalFrom = oppositeDir(c.direction);
       $("slug").value = c.slug;
       $("load").click();
     });
@@ -931,18 +1486,45 @@ async function loadLocationInfo() {
     $("locationOverlay").innerHTML = "";
   }
 
-  // Layout image for the selected version (falls back to any available).
-  const version = $("version").value;
+  // Layout: each version maps to an array of variants ({ label, url }), so a
+  // page like Eterna Forest can have separate "exterior" and "interior" layouts
+  // for the same game. Render a small variant pill row when there's >1.
+  // (`version` already declared at top of function.)
   const layoutImg = $("layoutImg");
   const layoutCap = $("layoutCaption");
   const layoutPanel = $("layoutPanel");
-  const layoutUrl = data.layouts && (data.layouts[version] || Object.values(data.layouts)[0]);
-  if (layoutUrl) {
-    layoutImg.src = `${proxy}/location/image?url=${encodeURIComponent(layoutUrl)}`;
-    layoutImg.style.display = "";
+  // Normalize: old shape was a string per version; new shape is an array.
+  const variantsForVersion = (() => {
+    const v = data.layouts && (data.layouts[version] || Object.values(data.layouts)[0]);
+    if (!v) return [];
+    return Array.isArray(v) ? v : [{ label: "main", url: v }];
+  })();
+  if (variantsForVersion.length > 0) {
     const usedVersion = data.layouts[version] ? version : Object.keys(data.layouts)[0];
-    layoutCap.textContent = `Layout (${usedVersion}).`;
-    layoutCap.style.display = "";
+    let activeIdx = 0;
+    const renderVariant = (idx) => {
+      const variant = variantsForVersion[idx];
+      layoutImg.src = `${proxy}/location/image?url=${encodeURIComponent(variant.url)}`;
+      layoutImg.style.display = "";
+      // Caption + variant pills.
+      let pills = "";
+      if (variantsForVersion.length > 1) {
+        pills = `<div class="layout-variants">` + variantsForVersion.map((v, i) =>
+          `<button class="layout-variant${i === idx ? " active" : ""}" data-idx="${i}">${v.label}</button>`
+        ).join("") + `</div>`;
+      }
+      layoutCap.innerHTML = `Layout (${usedVersion}, ${variant.label}).` + pills;
+      layoutCap.style.display = "";
+      layoutCap.querySelectorAll(".layout-variant").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          activeIdx = parseInt(btn.dataset.idx, 10);
+          renderVariant(activeIdx);
+          // Refresh immersive bg too, since the layout image changed.
+          $("layoutImg").addEventListener("load", refreshImmersiveBg, { once: true });
+        });
+      });
+    };
+    renderVariant(activeIdx);
     layoutPanel.style.display = "";
   } else {
     layoutImg.removeAttribute("src");
@@ -955,6 +1537,17 @@ async function loadLocationInfo() {
   const displayName = data.title.replace(/_/g, " ");
   $("routeTitle").textContent = displayName;
   $("routeSub").textContent = `${$("version").value} · ${$("tod").value === "auto" ? "auto" : $("tod").value.replace("time-", "")}`;
+
+  // Immersive-mode refreshes: bg image, edge connections, caption.
+  // The bg uses the image *URL* not its decoded pixels, so we don't need to
+  // wait for the image to load — set immediately, browser will fill in.
+  refreshImmersiveBg();
+  // Re-run once images finish loading too, in case the src was set after the
+  // call above (rare but safe).
+  $("layoutImg").addEventListener("load", refreshImmersiveBg, { once: true });
+  $("locationMap").addEventListener("load", refreshImmersiveBg, { once: true });
+  renderEdgeZones(currentConnections);
+  updateCaption();
 }
 
 // Detect the highlighted region on a Bulbapedia location map.
@@ -1393,9 +1986,762 @@ if (!loadSearchIndex()) {
 
 fillVersions("sinnoh"); // page default slug is sinnoh-route-201-area
 
+// Helper: keep both visible BGM status indicators in sync.
+function setBgmStatus(text) {
+  const el1 = $("bgmStatus"); if (el1) el1.textContent = text;
+  const el2 = $("bgmStatusSidebar"); if (el2) el2.textContent = text;
+}
+
 // Hamburger / sidebar toggle.
 $("hamburger").addEventListener("click", () => {
   $("sidebar").classList.toggle("open");
+});
+
+// --- Immersive mode ---
+
+const MODE_KEY = "uiMode:v1";
+function setMode(mode) {
+  document.body.classList.toggle("immersive", mode === "immersive");
+  document.documentElement.classList.toggle("immersive", mode === "immersive");
+  $("modeToggle").textContent = mode === "immersive"
+    ? "Switch to field-guide mode"
+    : "Switch to immersive mode";
+  localStorage.setItem(MODE_KEY, mode);
+  // When entering immersive, refresh edges + caption from current state.
+  if (mode === "immersive") {
+    renderEdgeZones(currentConnections);
+    refreshImmersiveBg();
+    updateCaption();
+  }
+}
+
+$("modeToggle").addEventListener("click", () => {
+  const next = document.body.classList.contains("immersive") ? "field-guide" : "immersive";
+  setMode(next);
+});
+
+// Boot: restore last-used mode.
+setMode(localStorage.getItem(MODE_KEY) || "field-guide");
+
+// Auto-load the boot slug so there's something on screen, especially in
+// immersive mode where an empty page reads as broken.
+setTimeout(() => $("load").click(), 50);
+
+// Browsers block AudioContext until a user gesture. On the first click or
+// keypress anywhere, resume the context and start whatever buffer is loaded.
+// One-shot: after this, normal startBgm calls work without prompt.
+// Console helper: type debugAudio() to see why music isn't playing.
+window.debugWalk = () => {
+  const summary = {
+    walking,
+    encounters: encounters.length,
+    audioCtxState: audioCtx?.state,
+    immersive: document.body.classList.contains("immersive"),
+    immersiveBgDims: _immersiveBgDims,
+    spritesOnStage: $("stage").querySelectorAll(".sprite, .sprite-pos").length,
+    encRate: parseFloat($("encRate").value),
+    stepMean: parseFloat($("stepMean").value),
+  };
+  console.table(summary);
+  return summary;
+};
+window.debugAudio = () => {
+  const summary = {
+    audioCtxState: audioCtx?.state ?? "(not created)",
+    audioUnlocked: _audioUnlocked,
+    pendingBgmBytes: _pendingBgmBytes ? `${(_pendingBgmBytes.bytes.byteLength / 1024).toFixed(1)} KB pending` : null,
+    bgmBuffer: bgmBuffer ? `AudioBuffer ${bgmBuffer.duration.toFixed(1)}s` : null,
+    bgmSource: bgmSource ? "playing" : null,
+    walking,
+    bgmStatus: $("bgmStatusSidebar")?.textContent,
+  };
+  console.table(summary);
+  return summary;
+};
+
+async function unlockAudioOnGesture() {
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
+  // Create the AudioContext now, inside the gesture handler. Chrome considers
+  // contexts created during a gesture as "allowed to start" — distinct from
+  // contexts created earlier programmatically.
+  ensureAudio();
+  if (audioCtx.state === "suspended") {
+    try { await audioCtx.resume(); } catch (e) { log(`audio resume failed: ${e.message}`); }
+  }
+  // Decode any pending BGM bytes that were stashed before the gesture.
+  if (_pendingBgmBytes) {
+    try {
+      bgmBuffer = await audioCtx.decodeAudioData(_pendingBgmBytes.bytes);
+      log(`decoded pending bgm bytes (${bgmBuffer.duration.toFixed(1)}s)`);
+    } catch (e) {
+      log(`pending bgm decode failed: ${e.message}`);
+    }
+    _pendingBgmBytes = null;
+  }
+  // Start the buffer if one is loaded.
+  if (bgmBuffer && !bgmSource) startBgm();
+  // Auto-start the walk loop once audio is unlocked. Music + encounters are
+  // unified — there's no "music only" mode in the user-facing UI, so kicking
+  // off both at the first gesture is the right default.
+  if (!walking && encounters.length > 0) startWalk();
+  status("Audio unlocked.");
+  log("audio unlocked by user gesture");
+}
+document.addEventListener("click", unlockAudioOnGesture, { once: false });
+document.addEventListener("keydown", unlockAudioOnGesture, { once: false });
+
+// Push the layout image (or fall back to the location map) into the immersive bg.
+function refreshImmersiveBg() {
+  const layoutAttr = $("layoutImg").getAttribute("src");
+  const mapAttr = $("locationMap").getAttribute("src");
+  const bgUrl = layoutAttr ? layoutAttr
+              : mapAttr ? mapAttr
+              : null;
+  if (bgUrl) {
+    $("immersiveBg").style.backgroundImage = `url("${bgUrl}")`;
+    // Decide between "fill the viewport" (small images) and "natural size + pan"
+    // (large images). Use the layout/map element's natural dims as the truth.
+    const sourceImg = layoutAttr ? $("layoutImg") : $("locationMap");
+    const setDims = () => {
+      const w = sourceImg.naturalWidth;
+      const h = sourceImg.naturalHeight;
+      if (!w || !h) return;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      // Scale up small images to at least cover the viewport, but only by
+      // integer multiples to keep the pixel art crisp.
+      const scale = Math.max(1, Math.ceil(Math.max(vw / w, vh / h)));
+      const dispW = w * scale;
+      const dispH = h * scale;
+      $("immersiveBg").style.backgroundSize = `${dispW}px ${dispH}px`;
+      _immersiveBgDims = { w: dispW, h: dispH };
+      // Spawn position based on arrival direction. If the user came from the
+      // west (clicked a west connection on the previous route), they're moving
+      // east — so we want them to start at the *western* edge of the new
+      // layout, looking eastward into the rest of it. Same logic per axis.
+      const overX = Math.max(0, dispW - vw);
+      const overY = Math.max(0, dispH - vh);
+      let nx = 0.5, ny = 0.5;
+      if (_arrivalFrom) {
+        const f = _arrivalFrom;
+        if (f.includes("west")) nx = 0;       // start at left edge
+        else if (f.includes("east")) nx = 1;  // start at right edge
+        if (f.includes("north")) ny = 0;
+        else if (f.includes("south")) ny = 1;
+      }
+      _panX = -overX * nx;
+      _panY = -overY * ny;
+      _arrivalFrom = null; // consumed
+      $("immersiveBg").style.backgroundPosition = `${_panX}px ${_panY}px`;
+    };
+    if (sourceImg.complete && sourceImg.naturalWidth > 0) setDims();
+    else sourceImg.addEventListener("load", setDims, { once: true });
+  } else {
+    $("immersiveBg").style.removeProperty("background-image");
+    _immersiveBgDims = null;
+  }
+}
+
+// Edge-scroll panning: cursor near an edge nudges the bg in that direction;
+// dead zone in the middle. Camera state is { x, y } in pixels (clamped to
+// the image's overhang). Velocity computed each frame from cursor proximity
+// to edges. Stops smoothly when cursor returns to the dead zone.
+const PAN_EDGE_THRESHOLD = 0.20;   // outer 20% of viewport on each side triggers pan
+const PAN_MAX_SPEED = 600;         // px/sec at the very edge
+
+let _panX = 0, _panY = 0;          // current background-position in px (negative = scrolled right/down)
+let _cursorNx = 0.5, _cursorNy = 0.5;
+let _panRafId = null;
+let _panLastTs = 0;
+
+function applyImmersivePan(nx, ny) {
+  // Backwards-compat shim: callers that used the old "set position to cursor"
+  // entry point now just store cursor coords; the RAF loop handles the rest.
+  _cursorNx = nx;
+  _cursorNy = ny;
+}
+
+// Compute the velocity contribution for one axis given normalized cursor pos.
+// Returns 0 inside the dead zone; ramps to ±PAN_MAX_SPEED at the edges.
+function panVelocityForAxis(n) {
+  // n is 0..1; dead zone is [threshold, 1-threshold].
+  if (n < PAN_EDGE_THRESHOLD) {
+    const t = (PAN_EDGE_THRESHOLD - n) / PAN_EDGE_THRESHOLD; // 0..1 as cursor approaches edge
+    return -PAN_MAX_SPEED * t * t; // ease-in
+  }
+  if (n > 1 - PAN_EDGE_THRESHOLD) {
+    const t = (n - (1 - PAN_EDGE_THRESHOLD)) / PAN_EDGE_THRESHOLD;
+    return PAN_MAX_SPEED * t * t;
+  }
+  return 0;
+}
+
+function panRafTick(ts) {
+  if (!document.body.classList.contains("immersive") || !_immersiveBgDims) {
+    _panRafId = null;
+    return;
+  }
+  const dt = _panLastTs ? (ts - _panLastTs) / 1000 : 0;
+  _panLastTs = ts;
+
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const overX = Math.max(0, _immersiveBgDims.w - vw);
+  const overY = Math.max(0, _immersiveBgDims.h - vh);
+
+  const vx = panVelocityForAxis(_cursorNx);
+  const vy = panVelocityForAxis(_cursorNy);
+
+  if (vx !== 0 || vy !== 0) {
+    _panX = Math.max(-overX, Math.min(0, _panX - vx * dt));
+    _panY = Math.max(-overY, Math.min(0, _panY - vy * dt));
+    $("immersiveBg").style.backgroundPosition = `${_panX}px ${_panY}px`;
+    updateSpritePositions();
+    showMinimap();
+  }
+
+  _panRafId = requestAnimationFrame(panRafTick);
+}
+
+// Minimap: outer box = scaled-down image dims, inner box = current viewport.
+// Shown while panning, fades out 1s after pan stops.
+let _minimapHideTimer = null;
+function showMinimap() {
+  if (!_immersiveBgDims) return;
+  const mm = $("minimap");
+  const view = $("minimapView");
+  const dispW = _immersiveBgDims.w;
+  const dispH = _immersiveBgDims.h;
+  // Outer box adapts to the image's aspect ratio with a capped long-axis size.
+  // The image fills the inner area exactly (no letterboxing), so a wide route
+  // gets a wide minimap and a tall cave gets a tall one.
+  const MAX_LONG = 160;
+  const ar = dispW / dispH;
+  let mmW, mmH;
+  if (ar >= 1) { mmW = MAX_LONG; mmH = MAX_LONG / ar; }
+  else { mmH = MAX_LONG; mmW = MAX_LONG * ar; }
+  // Outer box = inner area + 8px padding (4 each side).
+  mm.style.width = `${mmW + 8}px`;
+  mm.style.height = `${mmH + 8}px`;
+
+  const scale = mmW / dispW; // mmH / dispH gives the same value (we matched AR)
+  const vw = window.innerWidth, vh = window.innerHeight;
+  view.style.left = `${(-_panX) * scale}px`;
+  view.style.top = `${(-_panY) * scale}px`;
+  view.style.width = `${Math.min(vw * scale, mmW)}px`;
+  view.style.height = `${Math.min(vh * scale, mmH)}px`;
+
+  // Sprite dots: each .sprite-pos has imgX/imgY in image-space coords.
+  // Remove old dots, then redraw.
+  const inner = $("minimapInner");
+  inner.querySelectorAll(".minimap-sprite").forEach((el) => el.remove());
+  $("stage").querySelectorAll(".sprite-pos").forEach((sp) => {
+    const ix = parseFloat(sp.dataset.imgX);
+    const iy = parseFloat(sp.dataset.imgY);
+    if (Number.isNaN(ix) || Number.isNaN(iy)) return;
+    const dot = document.createElement("div");
+    dot.className = "minimap-sprite";
+    dot.style.left = `${ix * scale}px`;
+    dot.style.top = `${iy * scale}px`;
+    inner.appendChild(dot);
+  });
+
+  mm.classList.add("show");
+  if (_minimapHideTimer) clearTimeout(_minimapHideTimer);
+  _minimapHideTimer = setTimeout(() => {
+    mm.classList.remove("show");
+  }, 1000);
+}
+
+// Apply the current pan to any sprites carrying image-space coords.
+function updateSpritePositions() {
+  if (!document.body.classList.contains("immersive")) return;
+  const sprites = $("stage").querySelectorAll(".sprite-pos");
+  for (const el of sprites) {
+    const imgX = parseFloat(el.dataset.imgX);
+    const imgY = parseFloat(el.dataset.imgY);
+    if (Number.isNaN(imgX) || Number.isNaN(imgY)) continue;
+    el.style.setProperty("--sx", `${_panX + imgX - 48}px`);
+    el.style.setProperty("--sy", `${_panY + imgY - 48}px`);
+  }
+}
+
+function ensurePanLoop() {
+  if (_panRafId !== null) return;
+  _panLastTs = 0;
+  _panRafId = requestAnimationFrame(panRafTick);
+}
+
+// Don't pan while the cursor is over a corner UI element (or a popover that
+// belongs to one). RTS-style edge-pan vs corner-button conflict — if you
+// reach for the map button, you don't want the layout sliding under you.
+const PAN_UI_BLOCKERS = "#mapBtn, #encBtn, #hamburger, #player, #mapPopover, #encPanel, #sidebar, #searchWrap";
+
+document.addEventListener("mousemove", (e) => {
+  if (!document.body.classList.contains("immersive")) return;
+  if (e.target && e.target.closest && e.target.closest(PAN_UI_BLOCKERS)) {
+    _cursorNx = 0.5;
+    _cursorNy = 0.5;
+    return;
+  }
+  _cursorNx = e.clientX / window.innerWidth;
+  _cursorNy = e.clientY / window.innerHeight;
+  ensurePanLoop();
+});
+
+window.addEventListener("resize", () => {
+  if (document.body.classList.contains("immersive")) refreshImmersiveBg();
+});
+
+function updateCaption() {
+  const slug = $("slug").value.trim();
+  const display = slug.replace(/-area$/, "").replace(/-/g, " ");
+  $("immersiveCaption").textContent = `${display} · ${$("version").value}`;
+}
+
+// Edge-zone connection arrows.
+function renderEdgeZones(connections) {
+  const zones = { west: [], east: [], north: [], south: [] };
+  // "near" connections (no direction) -> sprinkle into south zone as a fallback
+  // so they're still discoverable in immersive mode.
+  for (const c of (connections || [])) {
+    const d = c.direction;
+    if (d && zones[d]) zones[d].push(c);
+    else zones.south.push(c);
+  }
+  for (const dir of Object.keys(zones)) {
+    const zone = $("edge" + dir[0].toUpperCase() + dir.slice(1));
+    if (!zone) continue;
+    const inner = zone.querySelector(".conns");
+    inner.innerHTML = "";
+    if (zones[dir].length === 0) {
+      zone.style.display = "none";
+      continue;
+    }
+    zone.style.display = "";
+    const arrow = ({ west: "←", east: "→", north: "↑", south: "↓" })[dir];
+    for (const c of zones[dir]) {
+      const btn = document.createElement("button");
+      btn.className = "edge-conn";
+      btn.textContent = `${arrow} ${c.name}`;
+      btn.title = c.slug;
+      btn.addEventListener("click", () => {
+        // Going "dir" means arriving from the opposite. Use the zone's dir
+        // (which reflects user intent — the edge they clicked) rather than
+        // c.direction (which can be "near" with no spatial info).
+        _arrivalFrom = oppositeDir(dir);
+        $("slug").value = c.slug;
+        $("load").click();
+      });
+      inner.appendChild(btn);
+    }
+  }
+}
+
+// Map popover (top-left button) shows the location map + connection list.
+// --- Bottom-right music player ---
+//
+// Collapsed: ♪ + truncated track title. Click to expand. Expanded: prev/next
+// (within most-recent searchBgm candidates), play/pause, scrub bar, and a
+// candidate picker toggle (▾) that lists the alternatives so the user can
+// pick a different track without re-running search.
+
+function fmtTime(s) {
+  if (!Number.isFinite(s)) return "0:00";
+  const m = Math.floor(s / 60);
+  const r = Math.floor(s % 60);
+  return `${m}:${r.toString().padStart(2, "0")}`;
+}
+
+function currentBgmPosition() {
+  if (!bgmBuffer || !audioCtx) return 0;
+  if (!bgmSource) return _playerSeekOffset; // paused at the seek position
+  const elapsed = audioCtx.currentTime - _playerStartedAt;
+  const pos = (_playerSeekOffset + elapsed) % bgmBuffer.duration;
+  return pos;
+}
+
+function refreshPlayer() {
+  const player = $("player");
+  if (!_playerCurrent) {
+    player.style.display = "none";
+    return;
+  }
+  player.style.display = "";
+  player.querySelector(".player-title").textContent = _playerCurrent.title;
+  $("playerToggle").textContent = bgmSource ? "⏸" : "▶";
+
+  // Candidate picker.
+  const list = $("playerCandidates");
+  list.innerHTML = _playerCandidates.map((c) =>
+    `<div class="player-candidate${c.title === _playerCurrent?.title ? " active" : ""}" data-title="${c.title}">${c.title} <span style="color:var(--muted);font-size:0.85em">(score ${c.score})</span></div>`
+  ).join("");
+  list.querySelectorAll(".player-candidate").forEach((el) => {
+    el.addEventListener("click", () => {
+      const c = _playerCandidates.find((x) => x.title === el.dataset.title);
+      if (c) pickBgm(c);
+    });
+  });
+}
+
+function tickPlayerTime() {
+  if (!_playerCurrent || !bgmBuffer) return;
+  const pos = currentBgmPosition();
+  const dur = bgmBuffer.duration;
+  $("playerTime").textContent = `${fmtTime(pos)} / ${fmtTime(dur)}`;
+  const scrub = $("playerScrub");
+  if (document.activeElement !== scrub) {
+    scrub.value = String((pos / dur) * 100);
+  }
+
+  // Loop-boundary detection: when position wraps past zero, we just completed
+  // a loop. The threshold (dur/2) avoids false positives from sub-second clock
+  // jitter; a real loop wrap is "position dropped by most of the duration."
+  if (bgmSource && _bgmLastPos - pos > dur / 2) {
+    _bgmLoopCount++;
+    onBgmLoopComplete();
+  }
+  _bgmLastPos = pos;
+}
+
+// Called once per BGM loop boundary while playing. This is the wander hook —
+// users move between locations on song completions, not on walk-step ticks.
+function onBgmLoopComplete() {
+  if (!walking) return;
+  if (!$("wanderOn").checked) return;
+  // First location of a session waits for ≥2 loops; subsequent locations only
+  // need ≥1 (since the loop boundary IS the trigger, that's any boundary here).
+  const minLoops = _isFirstLocationOfSession ? 2 : 1;
+  if (_bgmLoopCount < minLoops) {
+    log(`loop ${_bgmLoopCount}/${minLoops} — wander gated`);
+    return;
+  }
+  if (currentConnections.length === 0) return;
+  const wRate = parseFloat($("wanderRate").value);
+  if (Math.random() >= wRate) {
+    log(`loop ${_bgmLoopCount} — wander roll missed (p=${wRate})`);
+    return;
+  }
+  const next = currentConnections[Math.floor(Math.random() * currentConnections.length)];
+  log(`wander → ${next.name} (${next.slug})`);
+  $("stage").innerHTML = "";
+  _arrivalFrom = oppositeDir(next.direction);
+  _isFirstLocationOfSession = false;
+  $("slug").value = next.slug;
+  navigateTo(next.slug);
+}
+
+// Run the time tick at 4 Hz (250ms). Cheap; only renders when player is open.
+_playerInterval = setInterval(tickPlayerTime, 250);
+
+$("player").addEventListener("click", (e) => {
+  // Clicking buttons/scrub/candidates inside should NOT collapse/expand.
+  if (e.target.closest(".player-btn, .player-scrub, .player-candidate, .player-controls")) return;
+  const expanded = $("player").classList.toggle("expanded");
+  // Collapsing also dismisses the candidate dropdown — otherwise a stale
+  // dropdown peeks out the side of the collapsed pill.
+  if (!expanded) $("player").classList.remove("show-candidates");
+});
+
+$("playerToggle").addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (bgmSource) {
+    // Pause: remember current position, stop.
+    _playerSeekOffset = currentBgmPosition();
+    stopBgm();
+  } else if (bgmBuffer) {
+    ensureAudio();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    startBgm(_playerSeekOffset);
+  }
+});
+
+$("playerPrev").addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (_playerCandidates.length === 0 || !_playerCurrent) return;
+  const idx = _playerCandidates.findIndex((c) => c.title === _playerCurrent.title);
+  const prev = _playerCandidates[(idx - 1 + _playerCandidates.length) % _playerCandidates.length];
+  pickBgm(prev);
+});
+
+$("playerNext").addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (_playerCandidates.length === 0 || !_playerCurrent) return;
+  const idx = _playerCandidates.findIndex((c) => c.title === _playerCurrent.title);
+  const next = _playerCandidates[(idx + 1) % _playerCandidates.length];
+  pickBgm(next);
+});
+
+$("playerScrub").addEventListener("input", (e) => {
+  if (!bgmBuffer) return;
+  const pct = parseFloat(e.target.value) / 100;
+  const target = pct * bgmBuffer.duration;
+  // Web Audio sources can't seek; restart with offset.
+  const wasPlaying = !!bgmSource;
+  stopBgm();
+  if (wasPlaying) startBgm(target);
+  else _playerSeekOffset = target;
+});
+
+$("playerPickerToggle").addEventListener("click", (e) => {
+  e.stopPropagation();
+  $("player").classList.toggle("show-candidates");
+  $("player").classList.add("expanded"); // ensure we're expanded
+});
+
+// Encounter panel: bottom-left widget mirroring the map button. Shows the
+// current encounter table with sprites + percent, plus method pills (multi-
+// select) and time-of-day picker. Editing here re-runs the merge from
+// lastAreaData (no refetch).
+$("encBtn").addEventListener("click", () => {
+  const open = $("encPanel").classList.toggle("open");
+  if (open) renderEncounterPanel();
+});
+
+function renderEncounterPanel() {
+  const inner = $("encPanelInner");
+  const totalChance = encounters.reduce((s, p) => s + p.chance, 0) || 1;
+  const sortedSpecies = [...encounters].sort((a, b) => b.chance - a.chance);
+  const currentSlug = $("slug").value.trim();
+
+  // Area pills: shown when the parent location has multiple areas (split
+  // routes like 204/205, multi-floor caves). Strip the longest common prefix
+  // so labels read tersely (e.g. "north-towards-floaroma-town" instead of
+  // "sinnoh-route-204-north-towards-floaroma-town").
+  let areaPills = "";
+  if (areaSiblings.length > 1) {
+    const names = areaSiblings.map((a) => a.name);
+    let prefix = names[0];
+    for (const n of names) {
+      while (!n.startsWith(prefix)) prefix = prefix.slice(0, -1);
+    }
+    areaPills = `<div class="enc-section">areas</div><div class="method-pills">${areaSiblings.map((a) => {
+      const label = a.name.slice(prefix.length).replace(/^-/, "") || "main";
+      return `<button class="method-pill${a.name === currentSlug ? " active" : ""}" data-area="${a.name}">${label.replace(/-/g, " ")}</button>`;
+    }).join("")}</div>`;
+  }
+
+  // Method pills: every method PokéAPI knows about for this route+version.
+  const methodList = [...availableMethods.entries()].sort((a, b) => b[1] - a[1]).map(([m]) => m);
+  const methodPills = methodList.length === 0
+    ? `<div class="enc-section">no methods available</div>`
+    : `<div class="method-pills">${methodList.map((m) =>
+        `<button class="method-pill${selectedMethods.has(m) ? " active" : ""}" data-method="${m}">${m}</button>`
+      ).join("")}</div>`;
+
+  const todChoice = $("tod").value;
+  const todSelect = `
+    <select id="encTod" style="width:100%;margin-bottom:0.5em;">
+      ${["auto","time-morning","time-day","time-night","any"].map((v) =>
+        `<option value="${v}"${v === todChoice ? " selected" : ""}>${v.replace("time-","")}</option>`
+      ).join("")}
+    </select>
+  `;
+
+  const speciesRows = sortedSpecies.length === 0
+    ? `<div class="enc-section">empty</div>`
+    : sortedSpecies.map((p) => {
+        const pct = ((p.chance / totalChance) * 100).toFixed(1);
+        const sprite = p.spriteUrl
+          ? `<img src="${p.spriteUrl}" alt="${p.name}">`
+          : `<span style="width:32px"></span>`;
+        return `<div class="enc-row">${sprite}<span class="name">${p.name}</span><span class="pct">${pct}%</span></div>`;
+      }).join("");
+
+  // Encounter knobs: tucked behind a disclosure so the widget defaults to
+  // glanceable encounter info; click to reveal tuning.
+  const knobs = `
+    <details class="enc-tuning" style="margin-top:0.4em;margin-bottom:0.4em;">
+      <summary style="font-size:0.74em;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);cursor:pointer;padding:0.2em 0;">tuning</summary>
+      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:0.4em 0.6em;align-items:center;font-size:0.85em;margin-top:0.4em;">
+        <span>enc rate</span>
+        <input id="encRateMirror" type="range" min="0" max="0.5" step="0.01" value="${$("encRate").value}" style="width:100%;">
+        <span class="pct" style="min-width:3em;text-align:right;" id="encRateMirrorVal">${$("encRate").value}</span>
+
+        <span>cry vol</span>
+        <input id="cryVolMirror" type="range" min="0" max="1" step="0.05" value="${$("vol").value}" style="width:100%;">
+        <span class="pct" id="cryVolMirrorVal" style="min-width:3em;text-align:right;">${$("vol").value}</span>
+
+        <span>step (s)</span>
+        <input id="stepMeanMirror" type="number" min="0.2" step="0.1" value="${$("stepMean").value}" style="width:5em;">
+        <span></span>
+      </div>
+    </details>
+  `;
+
+  inner.innerHTML = areaPills + methodPills + todSelect + knobs + speciesRows;
+
+  // Mirror inputs back to canonical hidden ones.
+  inner.querySelector("#encRateMirror")?.addEventListener("input", (e) => {
+    $("encRate").value = e.target.value;
+    inner.querySelector("#encRateMirrorVal").textContent = e.target.value;
+  });
+  inner.querySelector("#cryVolMirror")?.addEventListener("input", (e) => {
+    $("vol").value = e.target.value;
+    inner.querySelector("#cryVolMirrorVal").textContent = e.target.value;
+  });
+  inner.querySelector("#stepMeanMirror")?.addEventListener("input", (e) => {
+    $("stepMean").value = e.target.value;
+  });
+
+  // Area pill clicks: navigate to that sibling area.
+  inner.querySelectorAll(".method-pill[data-area]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      $("slug").value = btn.dataset.area;
+      $("load").click();
+    });
+  });
+
+  // Wire pill clicks: toggle membership in selectedMethods, re-merge.
+  inner.querySelectorAll(".method-pill[data-method]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const m = btn.dataset.method;
+      if (selectedMethods.has(m)) {
+        if (selectedMethods.size > 1) selectedMethods.delete(m);
+        // Don't allow zero-method selection — keep at least one active.
+      } else {
+        selectedMethods.add(m);
+      }
+      // Mirror the legacy <select> to the first selected method for compat.
+      $("method").value = [...selectedMethods][0];
+      reMergeEncounters();
+    });
+  });
+
+  // Wire time-of-day change.
+  inner.querySelector("#encTod")?.addEventListener("change", (e) => {
+    $("tod").value = e.target.value;
+    reMergeEncounters();
+  });
+}
+
+// Re-run the encounter merge using the cached area data + current selections,
+// skipping the network round-trip and the per-species cry/sprite refetch.
+async function reMergeEncounters() {
+  if (!lastAreaData) return;
+  const version = $("version").value;
+  const todChoice = $("tod").value;
+  const band = todChoice === "auto" ? localTimeBand()
+             : todChoice === "any" ? null
+             : todChoice;
+  const TIME_VALUES = new Set(["time-morning", "time-day", "time-night"]);
+
+  // Reuse the existing per-species sprite/cry data we fetched on the original load.
+  const existing = new Map(encounters.map((p) => [p.name, p]));
+
+  const tally = new Map();
+  for (const enc of lastAreaData.pokemon_encounters) {
+    const vd = enc.version_details.find((v) => v.version.name === version);
+    if (!vd) continue;
+    let chanceSum = 0;
+    for (const ed of vd.encounter_details) {
+      if (!selectedMethods.has(ed.method.name)) continue;
+      const timeConds = ed.condition_values
+        .map((c) => c.name).filter((n) => TIME_VALUES.has(n));
+      const matches = band === null || timeConds.length === 0 || timeConds.includes(band);
+      if (!matches) continue;
+      chanceSum += ed.chance;
+    }
+    if (chanceSum > 0) tally.set(enc.pokemon.name, { name: enc.pokemon.name, url: enc.pokemon.url, chance: chanceSum });
+  }
+
+  // Fill in cry/sprite from cache; fetch missing.
+  const list = [...tally.values()];
+  await Promise.all(list.map(async (p) => {
+    const cached = existing.get(p.name);
+    if (cached) {
+      p.cryUrl = cached.cryUrl;
+      p.spriteUrl = cached.spriteUrl;
+      return;
+    }
+    try {
+      const r = await fetch(p.url);
+      const data = await r.json();
+      p.cryUrl = data.cries?.latest || data.cries?.legacy || null;
+      const gen4 = data.sprites?.versions?.["generation-iv"];
+      p.spriteUrl = gen4?.platinum?.front_default
+        || gen4?.["diamond-pearl"]?.front_default
+        || gen4?.["heartgold-soulsilver"]?.front_default
+        || data.sprites?.front_default || null;
+    } catch {}
+  }));
+  encounters = list.filter((p) => p.cryUrl);
+  renderTable();
+  renderEncounterPanel();
+  $("start").disabled = encounters.length === 0;
+}
+
+$("mapBtn").addEventListener("click", () => {
+  const pop = $("mapPopover");
+  const open = pop.classList.toggle("open");
+  if (open) renderMapPopover();
+});
+
+function renderMapPopover() {
+  const map = $("locationMap");
+  const conns = $("connections");
+  const wanderOn = $("wanderOn").checked;
+  const wanderRate = $("wanderRate").value;
+  const html = `
+    ${map.src ? `<img src="${map.src}" alt="">` : `<div style="color:var(--muted)">no map</div>`}
+    <div class="conn-list">${conns.innerHTML || ""}</div>
+    <div class="enc-section" style="margin-top:0.8em;">wander</div>
+    <div style="display:flex;gap:0.6em;align-items:center;font-size:0.88em;">
+      <label><input id="wanderOnMirror" type="checkbox"${wanderOn ? " checked" : ""}> on</label>
+      <label style="flex:1;">p
+        <input id="wanderRateMirror" type="range" min="0" max="1" step="0.05" value="${wanderRate}" style="width:100%;vertical-align:middle;">
+      </label>
+      <span class="pct" id="wanderRateMirrorVal">${wanderRate}</span>
+    </div>
+    <div class="map-caption" style="margin-top:0.3em;">Fires on each BGM loop boundary.</div>
+  `;
+  $("mapPopoverInner").innerHTML = html;
+  $("mapPopoverInner").querySelectorAll(".conn-list button").forEach((btn) => {
+    const slug = btn.getAttribute("title");
+    if (slug) {
+      btn.addEventListener("click", () => {
+        const conn = currentConnections.find((c) => c.slug === slug);
+        if (conn) _arrivalFrom = oppositeDir(conn.direction);
+        $("slug").value = slug;
+        $("load").click();
+        $("mapPopover").classList.remove("open");
+      });
+    }
+  });
+  $("wanderOnMirror")?.addEventListener("change", (e) => {
+    $("wanderOn").checked = e.target.checked;
+  });
+  $("wanderRateMirror")?.addEventListener("input", (e) => {
+    $("wanderRate").value = e.target.value;
+    $("wanderRateMirrorVal").textContent = e.target.value;
+  });
+}
+
+// "/" focuses search in immersive mode.
+document.addEventListener("keydown", (e) => {
+  if (e.key === "/" && document.body.classList.contains("immersive")) {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+    e.preventDefault();
+    $("searchWrap").classList.add("focus");
+    $("searchInput").focus();
+    $("searchInput").select();
+  } else if (e.key === "Escape") {
+    $("searchWrap").classList.remove("focus");
+    $("mapPopover").classList.remove("open");
+  } else if (e.key === "m" && document.body.classList.contains("immersive")) {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+    $("mapBtn").click();
+  }
+});
+
+// Hide search when it loses focus in immersive (and the user isn't picking a result).
+$("searchInput").addEventListener("blur", () => {
+  // Delay so result clicks register before hiding.
+  setTimeout(() => {
+    if (document.body.classList.contains("immersive") &&
+        document.activeElement !== $("searchInput")) {
+      $("searchWrap").classList.remove("focus");
+    }
+  }, 200);
 });
 
 $("rebuildIndex")?.addEventListener("click", async () => {
@@ -1403,33 +2749,18 @@ $("rebuildIndex")?.addEventListener("click", async () => {
   await buildSearchIndex();
 });
 
+// Single navigation pipeline: every Load = fresh encounters + fresh location +
+// fresh BGM resolution. searchBgm auto-picks the top candidate; pickBgm uses
+// the trackTitle-keyed mp3 cache to skip the network round-trip when possible.
 $("load").addEventListener("click", async () => {
   await loadEncounters();
   loadLocationInfo();
-  // BGM: prefer cached pick (fast), else auto-search + pick top candidate.
-  const restored = await tryRestoreBgm();
-  if (!restored) {
-    log("auto-searching BGM...");
-    await searchBgm(); // searchBgm auto-picks the top result
-  }
+  await searchBgm();
 });
 $("start").addEventListener("click", startWalk);
 $("stop").addEventListener("click", stopWalk);
 $("searchBgm").addEventListener("click", searchBgm);
 $("changeBgm").addEventListener("click", searchBgm);
-$("playBgm").addEventListener("click", () => {
-  if (!bgmBuffer) { status("No BGM loaded — search first."); return; }
-  ensureAudio();
-  if (audioCtx.state === "suspended") audioCtx.resume();
-  startBgm();
-  $("playBgm").disabled = true;
-  $("pauseBgm").disabled = false;
-});
-$("pauseBgm").addEventListener("click", () => {
-  stopBgm();
-  $("playBgm").disabled = false;
-  $("pauseBgm").disabled = true;
-});
 $("bgmVol").addEventListener("input", (e) => {
   if (bgmGain) bgmGain.gain.value = parseFloat(e.target.value);
 });
