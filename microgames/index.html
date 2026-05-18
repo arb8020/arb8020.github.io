@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Microgames</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    color: #e0e0e0;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 40px;
+    padding: 40px;
+  }
+  h1 {
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #555;
+  }
+  .games {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    max-width: 800px;
+    width: 100%;
+  }
+  .game {
+    border: 1px solid #1a1a1a;
+    padding: 24px 20px;
+    text-decoration: none;
+    color: #ccc;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .game:hover {
+    border-color: #333;
+    background: #111;
+  }
+  .game-name {
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .game-meta {
+    font-size: 11px;
+    color: #444;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    color: #555;
+    border: 1px solid #222;
+    padding: 1px 6px;
+    border-radius: 2px;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+  <h1>microgames</h1>
+  <div class="games">
+    <a class="game" href="breakout/">
+      <div class="game-name">breakout</div>
+      <div class="game-meta">pufferlib ocean</div>
+      <span class="tag">1P</span>
+      <span class="tag">← →</span>
+    </a>
+    <a class="game" href="snake/">
+      <div class="game-name">snake</div>
+      <div class="game-meta">pufferlib ocean</div>
+      <span class="tag">1P</span>
+      <span class="tag">WASD</span>
+    </a>
+  </div>
+</body>
+</html>
