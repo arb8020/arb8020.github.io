@@ -9,7 +9,7 @@ one day a young man from far away arrived in a small town, in search of work.
 
 at the edge of the town, he stopped at a small family-owned diner with nary a line for breakfast.
 
-sitting at the booth alone, enjoying the hospitality of the small town, he found this humble breakfast of a pancake and two eggs the best he'd ever had.
+sitting at the booth alone, enjoying the hospitality of the small town, he found this humble breakfast of two eggs and pancakes the best he'd ever had.
 
 a perfectly jammy egg, the pancakes not too sweet from syrup. the man wanted to thank the kitchen.
 
@@ -23,23 +23,23 @@ the writer enjoyed his way of thanking the staff. he'd little money left to spar
 
 unbeknownst to him, the staff appreciated it too. the first diner's staff framed an especially eloquent handkerchief outside their door.
 
-the son of a nearby baker found one of the writer's handkerchief's when cleaning up his table. 
+the son of a nearby baker, a paperboy, found one of the writer's handkerchiefs when cleaning up his table.
 
-upon reading it, bread became brioche. he understood what his mother saw in her craft.
+upon reading it, his mother's bread became brioche. 
 
-looking to make some money himself, the paperboy offered the man some extra change if he'd offer to submit his writings on food to the local newspaper as a new column
+dozens of papers delivered, yet nothing had moved the boy so
 
-having not found any other work yet, the man accepted this kind offer. 
+the boy offered the man a cut of his profit if he'd be allowed to turn the handkerchief scribbles to columns in the paper.
 
-the paperboy's only request was that he stay truthful. lies wouldn't survive in such a small town.
+having not found any other work yet, the man accepted the offer. 
 
-one morning the line at the diner at the perimeter of the town ran around the block.
+working together, the boy moved more papers, and the papers themselves were more moving. 
 
-a personal note with a name recognized from the paper ought to mean something, after all.
+one morning, the line at the diner at the perimeter of the town ran around the block.
 
-the commotion grew until even a county official caught wind. he declared that diner the best in the county
+a personal note with a name recognized from that paper ought to mean something, after all.
 
-the critic felt good about himself. he'd brought business to a small family. 
+the critic felt good about himself. he'd brought business to not one, but two small families. 
 
 how could that be wrong?
 
@@ -59,9 +59,9 @@ listening to folks whispering around the town would have you believe the diner h
 
 mind you, there was nothing special about those first meals.
 
-a moment too long on the pan making just the right textured yolk.
+a generous stack of pancakes melting on the tongue of a hungry young man
 
-lightly roasted beans leaving the mouth sour instead of a bitter aftertaste.
+lightly roasted beans leaving the mouth sour, preferred to a bitter aftertaste.
 
 but the paperboy was right. the townsfolk hung on every word the critic had to say.
 
@@ -90,9 +90,9 @@ he shouldn't have been surprised, nor disappointed.
 
 it hadn't been in the county's top 10 after all. the critic couldn't let his personal favorites sway the ranking.
 
-in place of the bakery was a modestly sized newspaper center. the paperboy had done well for himself, it seemed.
+above that old bakery was a five story media center. that paperboy had done well for himself, it seemed.
 
-as he looked for the cafe, the aroma of coffee in the air, he found instead printing presses and the smell of ink. he noticed there wasn't much food at all in the town anymore.
+but as he looked for the cafe, the aroma of coffee in the air, he found instead printing presses and the smell of ink. he noticed there wasn't much food at all in the town anymore.
 
 and without quite choosing to, his criticism lost its teeth.
 
@@ -104,14 +104,14 @@ an ambitious take on a classic meal so clearly described, a man with no tongue m
 
 yet no admission if he'd want to eat it again.
 
-after all, the newspaper's editor told him he was not to lie.
+slowly, other critics and journalists in that town rose to acclaim. the editor reassigned the food column, leaving the reviewer a modest section towards the back of the paper.
 
-slowly, other critics and journalists in that town rose to acclaim. the editor left the reviewer a column and cash, but not for food.
+but the writer had spent so long on food he wasn't well able to write about much else. he honestly didn't care to.
 
-the writer had spent so long on food he wasn't well able to write about much else. he honestly didn't care to.
+and so the writer's last section too faded away. an unknown weight off his shoulders.
 
-and so the writer's column too faded away. an unknown weight off his shoulders.
+bread was still brioche to the man. and were his handkerchief large enough to hold his thanks, it'd be a tablecloth.
 
-the man was wealthy, no longer in search of work, nor wanting for cash to leave a tip.
+the man was wealthy, no longer in search of work, nor wanting for cash to leave a generous tip.
 
 but he'd still scribble a note on a handkerchief.
