@@ -33,13 +33,13 @@ the boy offered the man a cut of his profit if he'd be allowed to turn the handk
 
 having not found any other work yet, the man accepted the offer. 
 
-at first the paperboy transcribed the scribbles word for word, with the headlines his own. 
+at first the boy transcribed the scribbles word for word, with the headlines his own. 
 
 as he continued his work, traveling further to spread the news, the paperboy started to write of places the way the man wrote of plates
 
 the paperboy was moving more papers, and the papers themselves were more moving. 
 
-one morning, the line at the diner at the perimeter of the town ran around the block.
+one morning, the line at the diner at the edge of the town ran around the block.
 
 a personal note with a name recognized from that paper ought to mean something, after all.
 
