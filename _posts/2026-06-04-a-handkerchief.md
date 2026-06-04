@@ -112,7 +112,7 @@ slowly, other critics and journalists in that town rose to acclaim.
 
 the paperboy reassigned the food column, leaving the reviewer a modest section towards the back of the paper to fill however he'd like. 
 
-"it's quieter in the back."
+he delivered the news himself: "it's quieter in the back."
 
 but the writer had spent so long on food he wasn't well able to write about much else. he honestly didn't care to.
 
