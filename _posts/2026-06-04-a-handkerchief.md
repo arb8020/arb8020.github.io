@@ -23,17 +23,21 @@ the writer enjoyed his way of thanking the staff. he'd little money left to spar
 
 unbeknownst to him, the staff appreciated it too. the first diner's staff framed an especially eloquent handkerchief outside their door.
 
-the son of a nearby baker, a paperboy, found one of the writer's handkerchiefs when cleaning up his table.
+the son of a nearby baker, a paperboy, found one of the writer's handkerchiefs when closing up the bakery for the day.
 
 upon reading it, his mother's bread became brioche. 
 
 dozens of papers delivered, yet nothing had moved the boy so
 
-the boy offered the man a cut of his profit if he'd be allowed to turn the handkerchief scribbles to columns in the paper.
+the boy offered the man a cut of his profit if he'd be allowed to turn the handkerchief scribbles into columns in the paper.
 
 having not found any other work yet, the man accepted the offer. 
 
-working together, the boy moved more papers, and the papers themselves were more moving. 
+at first the paperboy transcribed the scribbles word for word, with the headlines his own. 
+
+as he continued his work, traveling further to spread the news, the paperboy started to write of places the way the man wrote of plates
+
+the paperboy was moving more papers, and the papers themselves were more moving. 
 
 one morning, the line at the diner at the perimeter of the town ran around the block.
 
@@ -49,7 +53,7 @@ a local bakery, an ice cream shop.
 
 one experience at a cafe forced it to shut down.
 
-nobody wanted to drink coffee that was 'sour like juice'.
+nobody wanted to drink coffee that was 'sour as juice'.
 
 and that first diner had far more business than they'd anticipated.
 
@@ -77,7 +81,7 @@ yet unrecognized family recipes would turn trendy overnight.
 
 by now many of his readers had forgotten how to taste.
 
-if it wasn't on the critics list, they simply wouldn't go.
+if it wasn't on the critic's list, they simply wouldn't go.
 
 
 <br>
