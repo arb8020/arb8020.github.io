@@ -17,9 +17,9 @@ the words came easily. he scribbled his thoughts onto a handkerchief and left a 
 
 he dined there a few more times, and continued his practice elsewhere. writing notes for the staff when he'd enjoyed a meal. 
 
-each note was a bit more full, a bit more detailed. it wedged the meals a bit deeper into his memory.
-
 the writer enjoyed his way of thanking the staff. he'd little money left to spare for a tip otherwise.
+
+each note was a bit more full, a bit more detailed. it wedged the meals a bit deeper into him. into his tongue, into his memory.
 
 and the staff appreciated it too. the first diner's staff framed an especially eloquent handkerchief outside their door.
 
@@ -47,13 +47,13 @@ a personal note with a name recognized from that paper ought to mean something, 
 
 the critic smiled. he'd brought business to not one, but two small families. 
 
-how could that be wrong?
+how could that be wrong? 
 
-now remember, the critic had written many notes before the newspaper started to publish them.
+now remember, the critic had written many notes before he knew they'd be published. 
 
-a nearby bakery, an ice cream shop.
+a nearby bakery, an ice cream shop. 
 
-one experience at a cafe forced it to shut down.
+in particular the townsfolk stopped visiting a once-popular cafe 
 
 nobody wanted to drink coffee that was 'sour like juice'.
 
@@ -73,16 +73,15 @@ but still the townsfolk hung on every word the critic had to say.
 
 a woman might finish her breakfast, then wait on the paper to learn if she'd enjoyed it.
 
+a man might read the paper over breakfast, then taste the maple in his morning syrup for the first time.
+
 and those who wore the aprons hated him. 
 
 that critic couldn't cook his way out of a stocked pantry, they'd protest. thanks to him, the whole county's forgetting how to taste.
 
 yet a passing note could turn some unknown cook into a chef. a weeknight dinner into a state-wide sensation. 
 
-a man might read the paper over breakfast, then savor a local staple for the first time.
-
 the paperboy once wrote of where the critic would eat. now the critic ate for free where the paperboy would write. 
-
 
 <br>
 
@@ -90,7 +89,7 @@ after seasons touring through the state, he made his way back to that first town
 
 it was closed.
 
-he shouldn't have been surprised, nor disappointed.
+he shouldn't have been surprised. nor disappointed.
 
 it hadn't been in the county's top 10 after all. the critic couldn't let his personal favorites sway the ranking.
 
@@ -98,17 +97,15 @@ above that old bakery, still perfuming the morning air, was a five story media c
 
 but as he looked around for the ice cream shop, listened for familiar chatter from the nearby cafe, he found instead printing presses and the smell of ink. he noticed there wasn't much food at all in the town anymore.
 
-and without quite choosing to, his criticism lost its teeth.
+and without quite choosing to, he swallowed his verdicts.
 
-a keen reader would find that the reviewer's columns were now more about what was left unsaid.
+paragraphs on plating and presentation, on aroma, on flavor, on texture.
 
-paragraphs on plating and presentation left no room for mention of the unpleasant meal.
+a dish so clearly described, a man with no tongue might still savor it.
 
-an ambitious take on a classic meal so clearly described, a man with no tongue might still savor it.
+yet no admission of whether he'd want to eat it again.
 
-yet no admission if he'd want to eat it again.
-
-slowly, other critics and journalists in that town rose to acclaim. 
+and the county, still hungry, raised new critics to acclaim.
 
 the paperboy reassigned the food column, leaving the reviewer a modest section towards the back of the paper to fill however he'd like. 
 
