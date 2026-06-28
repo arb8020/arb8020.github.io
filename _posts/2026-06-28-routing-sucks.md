@@ -9,7 +9,7 @@ i don't think i would ever use a model router for a coding agent[^2]. here's why
 
 ## 0. i don't trust your routing
 
-your router is not calibrated on my data. you can argue all you want about the rest but fundamentally you will hit this problem your router is probably going to be calibrated off of much less data than i will eventually put through it. you'll probably be routing off of mean@k instead of worst@k. generously, even if you were to somehow continuously calibrate to near-perfection using worst@k off of my data, UX problems are still abound. 
+your router is not calibrated on my data. you can argue all you want about the rest but fundamentally you will hit this problem your router is probably going to be calibrated off of much less data than i will eventually put through it, and different data. you'll probably be routing off of the mean success rate over k trials, instead of making sure i see a failed route only x% of the time, which matters especially in multi-turn/consistency sensitive contexts. generously, even if you were to somehow continuously calibrate to near-perfection over my actual usage distribution, UX problems are still abound. 
 
 ## 1. as a user model routing always feels bad
 
