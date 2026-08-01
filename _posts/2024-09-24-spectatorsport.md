@@ -7,7 +7,8 @@ category: essay
 ---
 
 > Math is not a spectator sport
-- george polya 
+>
+> -- george polya
 
 
 when learning, it is really tempting to watch awe-inspiring youtube [videos](https://www.youtube.com/watch?v=fNk_zzaMoSs) and [tutorials](https://www.youtube.com/watch?v=kCc8FmEb1nY), read in-depth [blog posts](https://siboehm.com/articles/22/CUDA-MMM) and bookmark [cheatsheets](https://x.com/novasarc01/status/1833610102240383266) on twitter. as you listen/read/watch, you can feel yourself getting smarter. ‘wow that makes so much sense’, you say, as someone else does the work for you.

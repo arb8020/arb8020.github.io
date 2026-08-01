@@ -41,6 +41,7 @@ you might argue you could do turn level routing, we can just use a smaller model
 ## 5. user behavior/people get attached to models lol
 
 what about the advisor pattern? why don't we do a one-time escalation to a smarter model for the rest of the session if we need it, or have the full session be driven by a smaller model that has a tool call to a smarter one? 
+
 turns out people really like talking to smarter models. see anecdotes on Fable/etc. you see people constantly switching between the top k to make sure they're getting the best model. else you wouldn't see so much powerscaling chat on twitter about 'oh actually this model is better for frontend' etc.
 
 and each model feels different to use. each one is its own coworker personality. sure, users might still choose to use claude for codebase understanding, gpt for blowing up hard debugging problems, and GLM for frontend, but the user chose those! 

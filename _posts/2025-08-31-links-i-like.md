@@ -1,4 +1,3 @@
-
 ---
 layout: post
 title: "links that i like"
