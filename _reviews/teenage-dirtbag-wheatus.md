@@ -5,4 +5,4 @@ slug: teenage-dirtbag-wheatus
 category: song
 ---
 
-a friend showed me this song i fuck w them heavy
+a friend showed me this song. i fuck w it heavy

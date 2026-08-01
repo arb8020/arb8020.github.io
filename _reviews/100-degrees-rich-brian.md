@@ -5,5 +5,4 @@ slug: 100-degrees-rich-brian
 category: song
 ---
 
-vivid vivid memories of freshman year of college with friends
-related to history
+vivid vivid memories of freshman year of college
