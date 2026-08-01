@@ -120,11 +120,6 @@
         <li><a href="https://github.com/arb8020/optimizing-matmul-exercises">INTERACTIVE: CUDA matmul optimization</a></li>
     </ul>
 
-    <h2>drafts</h2>
-    <ul>
-        {% for draft in site.draft-posts %}
-        <li><a href="{{ draft.url | relative_url }}">{{ draft.title }}</a></li>
-        {% endfor %}
-    </ul>
+    <!-- drafts hidden from homepage, still accessible at /drafts/:slug/ -->
 </body>
 </html>
