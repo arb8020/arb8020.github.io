@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "100 degrees - Rich Brian"
 slug: 100-degrees-rich-brian
 category: song

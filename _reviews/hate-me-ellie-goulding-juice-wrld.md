@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "hate me - ellie goulding juice WRLD"
 slug: hate-me-ellie-goulding-juice-wrld
 category: song

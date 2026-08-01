@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "all of the lights - kanye west"
 slug: all-of-the-lights-kanye-west
 category: song

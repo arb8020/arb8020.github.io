@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "magic shop - bts"
 slug: magic-shop-bts
 category: song

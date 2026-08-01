@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "ao no sumika"
 slug: ao-no-sumika
 category: song

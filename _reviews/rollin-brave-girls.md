@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "rollin' - brave girls"
 slug: rollin-brave-girls
 category: song

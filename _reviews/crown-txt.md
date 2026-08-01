@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "crown - txt"
 slug: crown-txt
 category: song

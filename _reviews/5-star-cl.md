@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "5 star - CL"
 slug: 5-star-cl
 category: song

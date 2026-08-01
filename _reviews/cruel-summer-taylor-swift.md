@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "cruel summer - taylor swift"
 slug: cruel-summer-taylor-swift
 category: song

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "international love - pitbull"
 slug: international-love-pitbull
 category: song

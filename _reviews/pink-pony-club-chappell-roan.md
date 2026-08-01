@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "pink pony club - chappell roan"
 slug: pink-pony-club-chappell-roan
 category: song

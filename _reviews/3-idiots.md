@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "3 idiots"
 slug: 3-idiots
 category: movie

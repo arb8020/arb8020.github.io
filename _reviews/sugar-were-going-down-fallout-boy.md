@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "sugar we're going down - fallout boy"
 slug: sugar-were-going-down-fallout-boy
 category: song

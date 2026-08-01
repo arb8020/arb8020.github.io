@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "you better know - red velvet"
 slug: you-better-know-red-velvet
 category: song

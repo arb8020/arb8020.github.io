@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "dial drunk - noah kahan post malone"
 slug: dial-drunk-noah-kahan-post-malone
 category: song

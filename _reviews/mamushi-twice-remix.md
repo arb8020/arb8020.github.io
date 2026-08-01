@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "mamushi - twice remix"
 slug: mamushi-twice-remix
 category: song

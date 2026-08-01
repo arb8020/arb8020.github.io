@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "choosin' texas - ella langley"
 slug: choosin-texas-ella-langley
 category: song

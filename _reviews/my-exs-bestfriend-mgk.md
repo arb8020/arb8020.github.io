@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "my ex's bestfriend - mgk"
 slug: my-exs-bestfriend-mgk
 category: song

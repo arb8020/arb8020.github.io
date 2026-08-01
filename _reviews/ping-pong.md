@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "ping pong"
 slug: ping-pong
 category: anime

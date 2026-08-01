@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "how i review things"
 slug: how-i-review-things
 category: manifesto

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "teenage dirtbag - wheatus"
 slug: teenage-dirtbag-wheatus
 category: song

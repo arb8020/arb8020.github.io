@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "steins gate"
 slug: steins-gate
 category: anime

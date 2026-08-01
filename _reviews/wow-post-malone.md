@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "wow - post malone"
 slug: wow-post-malone
 category: song

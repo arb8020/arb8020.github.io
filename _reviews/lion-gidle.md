@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "lion - gidle"
 slug: lion-gidle
 category: song

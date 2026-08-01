@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "you shook me all night long - ACDC"
 slug: you-shook-me-all-night-long-acdc
 category: song

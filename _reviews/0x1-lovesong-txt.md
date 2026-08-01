@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "0x1=LOVESONG - txt"
 slug: 0x1-lovesong-txt
 category: song

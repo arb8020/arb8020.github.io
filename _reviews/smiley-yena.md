@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "smiley - YENA"
 slug: smiley-yena
 category: song

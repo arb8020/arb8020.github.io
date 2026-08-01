@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: review
 title: "eastside - halsey + khalid"
 slug: eastside-halsey-khalid
 category: song
