@@ -76,35 +76,7 @@
         {% for post in collections %}
         <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a></li>
         {% endfor %}
-    </ul>
-
-    <h2>reviews</h2>
-    <ul>
-        {% assign manifesto = site.reviews | where: "category", "manifesto" %}
-        {% for post in manifesto %}
-        <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a></li>
-        {% endfor %}
-    </ul>
-    <h3>songs</h3>
-    <ul>
-        {% assign songs = site.reviews | where: "category", "song" | sort: "title" %}
-        {% for post in songs %}
-        <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a></li>
-        {% endfor %}
-    </ul>
-    <h3>anime</h3>
-    <ul>
-        {% assign anime = site.reviews | where: "category", "anime" | sort: "title" %}
-        {% for post in anime %}
-        <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a></li>
-        {% endfor %}
-    </ul>
-    <h3>movies</h3>
-    <ul>
-        {% assign movies = site.reviews | where: "category", "movie" | sort: "title" %}
-        {% for post in movies %}
-        <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a></li>
-        {% endfor %}
+        <li><a href="/reviews/">reviews</a> (songs, anime, movies)</li>
     </ul>
 
     <h2>research notes</h2>
