@@ -3,6 +3,7 @@ layout: post
 title: "keeping LLM code honest"
 date: 2026-01-11
 slug: keeping-llm-code-honest
+category: essay
 ---
 
 i don't like to write boilerplate. as LLMs have gotten better, more and more code output feels like writing boilerplate. as a result, i've been daily driving coding with LLMs for about a year now. i'd estimate about 99% of the LoC i've produced that actually ran in prod since then has been LLM-generated.

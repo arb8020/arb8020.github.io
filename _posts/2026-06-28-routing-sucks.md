@@ -3,6 +3,7 @@ layout: post
 title: "why agentic model routing is almost impossible"
 date: 2026-06-28
 slug: routing-sucks
+category: essay
 ---
 
 i don't think i would ever use a model router for a coding agent. here's why

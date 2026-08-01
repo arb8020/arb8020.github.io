@@ -46,14 +46,64 @@
     
     <p>brief description coming soon.</p>
     
-    <h2>stuff i've written</h2>
+    <h2>essays</h2>
     <ul>
-        {% for post in site.posts %}
-        {% if post.slug == 'links-i-like' %}
-        <li><a href="{{ post.url | relative_url }}">links that i like</a> ({{ post.date | date: "%Y-%m-%d" }})</li>
-        {% else %}
+        {% assign essays = site.posts | where: "category", "essay" %}
+        {% for post in essays %}
         <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a> ({{ post.date | date: "%Y-%m-%d" }})</li>
-        {% endif %}
+        {% endfor %}
+    </ul>
+
+    <h2>stories</h2>
+    <ul>
+        {% assign stories = site.posts | where: "category", "story" %}
+        {% for post in stories %}
+        <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a> ({{ post.date | date: "%Y-%m-%d" }})</li>
+        {% endfor %}
+    </ul>
+
+    <h2>poems</h2>
+    <ul>
+        {% assign poems = site.posts | where: "category", "poem" %}
+        {% for post in poems %}
+        <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a></li>
+        {% endfor %}
+    </ul>
+
+    <h2>collections</h2>
+    <ul>
+        {% assign collections = site.posts | where: "category", "collection" %}
+        {% for post in collections %}
+        <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a></li>
+        {% endfor %}
+    </ul>
+
+    <h2>reviews</h2>
+    <ul>
+        {% assign manifesto = site.reviews | where: "category", "manifesto" %}
+        {% for post in manifesto %}
+        <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a></li>
+        {% endfor %}
+    </ul>
+    <h3>songs</h3>
+    <ul>
+        {% assign songs = site.reviews | where: "category", "song" | sort: "title" %}
+        {% for post in songs %}
+        <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a></li>
+        {% endfor %}
+    </ul>
+    <h3>anime</h3>
+    <ul>
+        {% assign anime = site.reviews | where: "category", "anime" | sort: "title" %}
+        {% for post in anime %}
+        <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a></li>
+        {% endfor %}
+    </ul>
+    <h3>movies</h3>
+    <ul>
+        {% assign movies = site.reviews | where: "category", "movie" | sort: "title" %}
+        {% for post in movies %}
+        <li><a href="{{ post.url | relative_url }}">{{ post.title }}</a></li>
         {% endfor %}
     </ul>
 
@@ -66,10 +116,11 @@
 
     <h2>stuff i've made</h2>
     <ul>
+        <li><a href="/pokemon-soundscape/">Pokemon encounter soundscape</a></li>
         <li><a href="https://github.com/arb8020/optimizing-matmul-exercises">INTERACTIVE: CUDA matmul optimization</a></li>
     </ul>
 
-    <h2>stuff i've drafted</h2>
+    <h2>drafts</h2>
     <ul>
         {% for draft in site.draft-posts %}
         <li><a href="{{ draft.url | relative_url }}">{{ draft.title }}</a></li>

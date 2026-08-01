@@ -9,3 +9,6 @@ collections:
   draft-posts:
     output: true
     permalink: /drafts/:slug/
+  reviews:
+    output: true
+    permalink: /reviews/:slug/

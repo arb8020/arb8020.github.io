@@ -3,6 +3,7 @@ layout: post
 title: "a handkerchief"
 date: 2026-06-04
 slug: a-handkerchief
+category: story
 ---
 
 one day a young man from far away arrived in a small town, in search of work.

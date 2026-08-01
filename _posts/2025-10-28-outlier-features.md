@@ -3,6 +3,7 @@ layout: post
 title: "emergent outlier features in 2025"
 date: 2025-10-29
 slug: outlier-features
+category: essay
 ---
 
 tl;dr: re-running Dettmers’ 2022 “6.7 B outlier-feature phase-transition” experiment on 7 recent MoE and 5 Qwen3 dense models shows no sudden jump in layer coordination. the activation signature for the anecdotal 7B “intelligence threshold” seems to have vanished, probably thanks to post-2022 architecture/data changes, but further study on the question is required 
@@ -72,9 +73,11 @@ here's where it gets interesting.
 ![Dense Models - Parameters vs Layer & Sequence Coverage](/assets/images/dense_params_dual.png)
 *figure 3: qwen3 dense models show stable ~30% layer coordination (blue) and high ~66-79% sequence coverage (orange) across all sizes - no phase transition*
 
-instead of seeing the phase transition Dettmers found at 6.7B, i found ~30% layer coordination across ALL model sizes. no phase transition. interestingly, the sequence coverage is consistently high (~66-79%), meaning outliers still affect most tokens when they appear.
+instead of seeing the phase transition Dettmers found at 6.7B, i found ~30% layer coordination across ALL model sizes. no phase transition. interestingly, the sequence coverage is consistently high (~66-79%), meaning outliers still affect most tokens when they appear. it makes sense that dense models would have higher sequence %, since they don't have the token-level expert routing MoE models do.
 
-its not clear what's changed between 2022 and 2025. one hypothesis is that we've had so many architectural improvements between now and 2022: RoPE, RMSNorm, new FFNs/activation functions like SwiGLU. so its hard to say what exactly might have changed the need for these outlier features.
+its not clear what's changed between 2022 and 2025 without doing further ablations, but i'll throw out some hypotheses. 
+
+one hypothesis is that we've had so many architectural improvements between now and 2022: RoPE, RMSNorm, new FFNs/activation functions like SwiGLU. any one of these could be responsible for the missing layer coordination of outlier features.
 
 additionally, new training datasets have become much more curated and filtered, and potentially higher signal. dettmers also found that the emergence correlated with model perplexity, not just model size. so higher quality data might have allowed models to learn feature representations that didn't require the outlier mechanism.
 
